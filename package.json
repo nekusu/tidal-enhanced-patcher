@@ -1,0 +1,8 @@
+{
+  "name": "tidal-enhanced-patcher",
+  "version": "1.0.0",
+  "author": "nekusu",
+  "license": "MIT",
+  "type": "module",
+  "private": true
+}
