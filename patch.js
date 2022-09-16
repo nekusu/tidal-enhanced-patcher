@@ -19,7 +19,11 @@ function installDiscordRpcLib(sourcePath) {
 function injectCode(filePath, modifications) {
   const file = readFileSync(filePath, { encoding: 'utf8' });
   let modifiedFile = file;
-  for (const { reference, code, newLine = true } of modifications) {
+  for (const { reference, code, newLine = true, replace = false } of modifications) {
+    if (replace) {
+      modifiedFile = modifiedFile.replace(reference, code);
+      continue;
+    }
     if (newLine) {
       const lines = modifiedFile.split(/\r?\n/);
       const lineIndex = lines.findIndex((line) => line.includes(reference));
@@ -36,7 +40,7 @@ function injectCode(filePath, modifications) {
 function createDiscordActivity(mainPath) {
   const discordScriptPath = join(mainPath, 'discord');
   const discordActivityFileName = 'DiscordActivity.js';
-  const mainControllerFilePath = join(join(mainPath, 'app'), 'MainController.js');
+  const mainControllerFilePath = join(mainPath, 'app/MainController.js');
 
   mkdirSync(discordScriptPath);
   copyFileSync(discordActivityFileName, join(discordScriptPath, discordActivityFileName));
@@ -53,7 +57,6 @@ function createDiscordActivity(mainPath) {
       );`,
     }
   ]);
-
   console.log('DiscordActivity created successfully');
 }
 
@@ -77,13 +80,12 @@ function createDiscordRpcSetting(mainPath) {
       code: 'discordRpcDisabled: _UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED,',
     }
   ]);
-
   console.log('Discord RPC setting created successfully');
 }
 
 function createDiscordRpcToggle(mainPath) {
-  const mainControllerFilePath = join(join(mainPath, 'app'), 'MainController.js');
-  const windowControllerFilePath = join(join(mainPath, 'window'), 'WindowController.js');
+  const mainControllerFilePath = join(mainPath, 'app/MainController.js');
+  const windowControllerFilePath = join(mainPath, 'window/WindowController.js');
 
   injectCode(mainControllerFilePath, [
     {
@@ -117,8 +119,20 @@ function createDiscordRpcToggle(mainPath) {
       }, {`,
     }
   ]);
-
   console.log('Discord RPC toggle created successfully');
+}
+
+function enableDevMenu(mainPath) {
+  const menuControllerFilePath = join(mainPath, 'menu/MenuController.js');
+
+  injectCode(menuControllerFilePath, [
+    {
+      reference: /process.env.NODE_ENV === 'development'/g,
+      code: 'true',
+      replace: true,
+    }
+  ]);
+  console.log('Dev menu enabled successfully');
 }
 
 async function createAsarPackage(appResourcesPath, asarFilePath, sourcePath) {
@@ -153,6 +167,7 @@ async function main() {
   createDiscordActivity(mainPath);
   createDiscordRpcSetting(mainPath);
   createDiscordRpcToggle(mainPath);
+  enableDevMenu(mainPath);
   await createAsarPackage(appResourcesPath, asarFilePath, sourcePath);
   console.log('TIDAL patched successfully');
 }
