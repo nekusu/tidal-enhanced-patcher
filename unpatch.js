@@ -1,10 +1,16 @@
 import { renameSync, rmSync } from 'fs';
 import { join } from 'path';
-import { tidalPath, isWindowsPlatform, existsInDefaultPath, getAppDirName } from './utils.js';
+import {
+  tidalPath,
+  isWindowsPlatform,
+  isAppRunning,
+  existsInDefaultPath,
+  getAppDirName,
+} from './utils.js';
 
-function main() {
+async function main() {
   console.log('TIDAL Enhanced Patcher - https://github.com/nekusu');
-  if (!isWindowsPlatform() || !existsInDefaultPath()) return;
+  if (!isWindowsPlatform() || await isAppRunning() || !existsInDefaultPath()) return;
 
   const appResourcesPath = join(tidalPath, getAppDirName(), 'resources');
   const asarFilePath = join(appResourcesPath, 'app.asar');

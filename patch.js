@@ -5,6 +5,7 @@ import { join } from 'path';
 import {
   tidalPath,
   isWindowsPlatform,
+  isAppRunning,
   existsInDefaultPath,
   getAppDirName,
   extractSourceFiles,
@@ -66,7 +67,7 @@ async function createAsarPackage(appResourcesPath, asarFilePath, sourcePath) {
 
 async function main() {
   console.log('TIDAL Enhanced Patcher - https://github.com/nekusu');
-  if (!isWindowsPlatform() || !existsInDefaultPath()) return;
+  if (!isWindowsPlatform() || await isAppRunning() || !existsInDefaultPath()) return;
 
   const appResourcesPath = join(tidalPath, getAppDirName(), 'resources');
   const asarFilePath = join(appResourcesPath, 'app.asar');

@@ -1,6 +1,10 @@
 import asar from 'asar';
+import { exec as _exec } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
+import { promisify } from 'util';
 import { join } from 'path';
+
+const exec = (command) => promisify(_exec)(command);
 
 const DEFAULT_TIDAL_PATH = join(process.env.APPDATA ?? '', '../Local/TIDAL');
 let tidalPath = DEFAULT_TIDAL_PATH;
@@ -11,6 +15,16 @@ function isWindowsPlatform() {
     console.error('Only Windows platforms are supported');
   }
   return isWindows;
+}
+
+async function isAppRunning() {
+  const taskListCommand = 'tasklist /v /fi "IMAGENAME eq tidal.exe"';
+  const { stdout } = await exec(taskListCommand);
+  const isRunning = !stdout.includes('No tasks');
+  if (isRunning) {
+    console.error('Close the app before running the patcher!');
+  }
+  return isRunning;
 }
 
 function existsInDefaultPath() {
@@ -40,6 +54,7 @@ function extractSourceFiles(asarFilePath, sourcePath) {
 export {
   tidalPath,
   isWindowsPlatform,
+  isAppRunning,
   existsInDefaultPath,
   getAppDirName,
   extractSourceFiles,
