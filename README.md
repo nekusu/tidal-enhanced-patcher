@@ -10,11 +10,17 @@ TIDAL Enhanced Patcher is a simple script that allows you to extend the function
 
 ### Discord Rich Presence integration
 
-<img src="./assets/discord-rpc-example.png" width="310" />
+<img src="./assets/discord-rpc.png" width="310" />
 
-<img src="./assets/system-tray-example.png" width="310" />
+<img src="./assets/system-tray.png" width="310" />
 
 Unlike many other [awesome repositories](https://github.com/search?q=tidal+discord) trying to address the lack of official Discord RPC integration, TEP directly modifies the source code so there is no need to run scripts in the background, reverse engineer the TIDAL API, or use third-party APIs. You can also toggle RPC very easily from the system tray menu. A native-like experience!
+
+### Developer menu enabled
+
+<img src="./assets/dev-menu.png" width="310" />
+
+You can now access various development tools disabled by default in the production build.
 
 ## Usage
 
@@ -47,7 +53,7 @@ Alternatively, you can go to `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\
 
 ## Disclaimer
 
-- This repository does not include any original source code of the TIDAL desktop app.
+- This repository does not include any original or modified source code of the TIDAL desktop app.
 - I am in no way responsible for account bans for using a modified client. Use the patcher at your own risk.
 
 ## Notes for devs
@@ -60,4 +66,4 @@ To manually extract the source code files run the following command:
 node extract
 ```
 
-`node_modules` are included in the repo due to a modification to the [asar npm package](https://www.npmjs.com/package/asar) `(asar/lib/asar.js:187)`. This change will avoid errors with .symlink files when extracting the asar archive located in `[source]/resources/osx`.
+`node_modules` are included in the repo due to a modification to the [asar npm package](https://www.npmjs.com/package/asar) `(asar/lib/asar.js:187)`. This change will avoid errors with .symlink files located in `[source]/resources/osx` when extracting the asar archive.
