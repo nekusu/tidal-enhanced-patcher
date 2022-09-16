@@ -13,38 +13,112 @@ import {
 
 function installDiscordRpcLib(sourcePath) {
   execSync('npm i discord-rpc', { cwd: sourcePath });
-  console.log('discord-rpc installed succesfully');
+  console.log('discord-rpc library installed succesfully');
 }
 
-function copyDiscordActivityFile(mainPath) {
+function injectCode(filePath, modifications) {
+  const file = readFileSync(filePath, { encoding: 'utf8' });
+  let modifiedFile = file;
+  for (const { reference, code, newLine = true } of modifications) {
+    if (newLine) {
+      const lines = modifiedFile.split(/\r?\n/);
+      const lineIndex = lines.findIndex((line) => line.includes(reference));
+      lines.splice(lineIndex, 0, code);
+      modifiedFile = lines.join('\n');
+    } else {
+      const charIndex = modifiedFile.search(reference);
+      modifiedFile = modifiedFile.substring(0, charIndex) + code + modifiedFile.substring(charIndex);
+    }
+  }
+  writeFileSync(filePath, modifiedFile);
+}
+
+function createDiscordActivity(mainPath) {
   const discordScriptPath = join(mainPath, 'discord');
   const discordActivityFileName = 'DiscordActivity.js';
+  const mainControllerFilePath = join(join(mainPath, 'app'), 'MainController.js');
 
   mkdirSync(discordScriptPath);
   copyFileSync(discordActivityFileName, join(discordScriptPath, discordActivityFileName));
-  console.log('DiscordActivity.js copied successfully');
+  injectCode(mainControllerFilePath, [
+    {
+      reference: 'var _electron',
+      code: 'var _DiscordActivity = _interopRequireDefault(require("../discord/DiscordActivity"));',
+    }, {
+      reference: 'let autoStartDelegate',
+      code: `this.discordActivity = new _DiscordActivity.default(
+        '1004259730526584873',
+        this.userSettingsController,
+        playbackStatusController,
+      );`,
+    }
+  ]);
+
+  console.log('DiscordActivity created successfully');
 }
 
-function modifyMainControllerFile(mainPath) {
-  const appPath = join(mainPath, 'app');
-  const mainControllerFilePath = join(appPath, 'MainController.js');
-  const mainControllerFile = readFileSync(mainControllerFilePath, { encoding: 'utf8' });
-  let modifiedFile = mainControllerFile;
+function createDiscordRpcSetting(mainPath) {
+  const userPath = join(mainPath, 'user');
+  const userSettingsKeysEnumFilePath = join(userPath, 'UserSettingsKeysEnum.js');
+  const userSettingsControllerFilePath = join(userPath, 'UserSettingsController.js');
 
-  // import DiscordActivity class
-  const importLineIndex = modifiedFile.search('var _electron');
-  modifiedFile = modifiedFile.substring(0, importLineIndex) +
-    'var _DiscordActivity = _interopRequireDefault(require("../discord/DiscordActivity"));\n\n' +
-    modifiedFile.substring(importLineIndex);
+  injectCode(userSettingsKeysEnumFilePath, [
+    {
+      reference: 'UserSettingsKeys["CLOSE_TO_TRAY"]',
+      code: 'UserSettingsKeys["DISCORD_RPC_DISABLED"] = "discord.rpc.disabled";',
+    }
+  ]);
+  injectCode(userSettingsControllerFilePath, [
+    {
+      reference: '[_UserSettingsKeysEnum.default.CLOSE_TO_TRAY]',
+      code: '[_UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED]: false,',
+    }, {
+      reference: 'closeToTray:',
+      code: 'discordRpcDisabled: _UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED,',
+    }
+  ]);
 
-  // instantiate DiscordActivity
-  const propertyDeclarationLineIndex = modifiedFile.search('let autoStartDelegate');
-  modifiedFile = modifiedFile.substring(0, propertyDeclarationLineIndex) +
-    'this.discordActivity = new _DiscordActivity.default("1004259730526584873", playbackStatusController);\n' +
-    modifiedFile.substring(propertyDeclarationLineIndex);
+  console.log('Discord RPC setting created successfully');
+}
 
-  writeFileSync(mainControllerFilePath, modifiedFile);
-  console.log('MainController.js modified successfully');
+function createDiscordRpcToggle(mainPath) {
+  const mainControllerFilePath = join(join(mainPath, 'app'), 'MainController.js');
+  const windowControllerFilePath = join(join(mainPath, 'window'), 'WindowController.js');
+
+  injectCode(mainControllerFilePath, [
+    {
+      reference: 'applicationDelegate, menuController',
+      code: 'this.userSettingsController, ',
+      newLine: false,
+    }
+  ]);
+  injectCode(windowControllerFilePath, [
+    {
+      reference: 'var _electron',
+      code: `var _UserSettingsController = _interopRequireDefault(require("../user/UserSettingsController"));
+        var _UserSettingsKeysEnum = _interopRequireDefault(require("../user/UserSettingsKeysEnum"));`,
+    }, {
+      reference: 'applicationDelegate, menuController',
+      code: 'userSettingsController, ',
+      newLine: false,
+    }, {
+      reference: 'this.applicationDelegate =',
+      code: 'this.userSettingsController = userSettingsController;',
+    }, {
+      reference: `type: 'separator'`,
+      code: `label: 'Discord Rich Presence',
+        type: 'checkbox',
+        checked: !this.userSettingsController.get(_UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED),
+        click: () => {
+          const discordRpcDisabledEnum = _UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED;
+          const discordRpcDisabled = this.userSettingsController.get(discordRpcDisabledEnum);
+          this.userSettingsController.set(discordRpcDisabledEnum, !discordRpcDisabled);
+        }
+      }, {`,
+    }
+  ]);
+
+  console.log('Discord RPC toggle created successfully');
 }
 
 async function createAsarPackage(appResourcesPath, asarFilePath, sourcePath) {
@@ -76,8 +150,9 @@ async function main() {
 
   extractSourceFiles(asarFilePath, sourcePath);
   installDiscordRpcLib(sourcePath);
-  copyDiscordActivityFile(mainPath);
-  modifyMainControllerFile(mainPath);
+  createDiscordActivity(mainPath);
+  createDiscordRpcSetting(mainPath);
+  createDiscordRpcToggle(mainPath);
   await createAsarPackage(appResourcesPath, asarFilePath, sourcePath);
   console.log('TIDAL patched successfully');
 }

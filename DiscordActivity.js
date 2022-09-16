@@ -13,11 +13,14 @@ var _ = require("lodash");
 
 var _AppEventEnum = _interopRequireDefault(require("../../shared/AppEventEnum"));
 
+var _UserSettingsKeysEnum = _interopRequireDefault(require("../user/UserSettingsKeysEnum"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 class DiscordActivity {
-  constructor(clientId, playbackStatusController) {
+  constructor(clientId, userSettingsController, playbackStatusController) {
     this.rpc = new _DiscordRPC.Client({ transport: 'ipc' });
+    this.userSettingsController = userSettingsController;
     this.playbackStatusController = playbackStatusController;
 
     this.rpc.login({ clientId });
@@ -25,6 +28,8 @@ class DiscordActivity {
   }
 
   handleActivity() {
+    let _discordRpcDisabled = this.userSettingsController
+      .get(_UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED);
     let _mediaItem = null;
     let _time = 0;
     let _isPlaying = false;
@@ -33,8 +38,7 @@ class DiscordActivity {
     // function debounced to prevent multiple calls when jumping to another song
     // due to multiple `PLAYBACK_CURRENT_TIME` events
     const updateActivity = _.debounce(() => {
-      const startTimestamp = Math.round(new Date().getTime() / 1000);
-      const endTimestamp = startTimestamp + (_mediaItem.duration - _time);
+      if (_discordRpcDisabled) return;
       const activity = {
         largeImageKey: _mediaItem.imageUrl,
         largeImageText: _mediaItem.album,
@@ -48,11 +52,32 @@ class DiscordActivity {
         instance: false,
       };
       if (_isPlaying) {
+        const startTimestamp = Math.round(new Date().getTime() / 1000);
+        const endTimestamp = startTimestamp + (_mediaItem.duration - _time);
         activity.startTimestamp = startTimestamp;
         activity.endTimestamp = endTimestamp;
+        clearTimeout(activityTimeout);
+      } else {
+        activityTimeout = setTimeout(() => {
+          this.rpc.clearActivity();
+        }, 60000); // timeout in ms for clearing activity when playback is paused
       }
       this.rpc.setActivity(activity);
     }, 100);
+
+    // check every second if Discord RPC has been disabled from the system tray
+    // possible improvement: integrate discordRpcDisabled value with redux store and
+    // remove this unnecessary interval
+    setInterval(() => {
+      const discordRpcDisabled = this.userSettingsController
+        .get(_UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED);
+      if (discordRpcDisabled === _discordRpcDisabled) return;
+      if (discordRpcDisabled) {
+        this.rpc.clearActivity();
+      }
+      _discordRpcDisabled = discordRpcDisabled;
+      updateActivity();
+    }, 1000);
 
     // get media info
     _electron.ipcMain.on(_AppEventEnum.default.PLAYBACK_CURRENT_MEDIAITEM, (_, mediaItem) => {
@@ -65,8 +90,7 @@ class DiscordActivity {
       const timeDifference = time - _time;
       const isNewTimeGreater = time > _time;
       _time = time;
-      // only update timestamps when song is playing and
-      // (time difference is greater than 1 second or elapsed time goes back)
+      // only update the timestamps when the following conditions are met
       if (_isPlaying && (timeDifference > 1 || !isNewTimeGreater)) {
         updateActivity();
       }
@@ -76,13 +100,6 @@ class DiscordActivity {
     this.playbackStatusController.getModel().on('playing', (isPlaying) => {
       _isPlaying = isPlaying;
       updateActivity();
-      if (isPlaying) {
-        clearTimeout(activityTimeout);
-      } else {
-        activityTimeout = setTimeout(() => {
-          this.rpc.clearActivity();
-        }, 60000); // timeout in ms for clearing activity when playback is paused
-      }
     });
   }
 }
