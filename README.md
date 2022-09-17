@@ -16,6 +16,12 @@ TIDAL Enhanced Patcher is a simple script that allows you to extend the function
 
 Unlike many other [awesome repositories](https://github.com/search?q=tidal+discord) trying to address the lack of official Discord RPC integration, TEP directly modifies the source code so there is no need to run scripts in the background, reverse engineer the TIDAL API, or use third-party APIs. You can also toggle RPC very easily from the system tray menu. A native-like experience!
 
+### Download your favorite music
+
+<img src="./assets/download-menu.png" width="310" />
+
+TIDAL Enhanced allows you to download music and videos in the highest quality directly from TIDAL thanks to the [Media Downloader](https://github.com/yaronzz/Tidal-Media-Downloader) app, just paste the track/album/artist link in the downloader and enjoy your offline music!
+
 ### Developer menu enabled
 
 <img src="./assets/dev-menu.png" width="310" />
@@ -47,13 +53,14 @@ Alternatively, you can go to `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\
 ## TODO
 
 - ~~Discord RPC toggle in system tray menu.~~ 🗸
+- ~~Integration with [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).~~ 🗸
 - Auto-patch source code after an app update.
-- MacOS support.
-- Integration with [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader) (?).
+- MacOS support (?).
 
 ## Disclaimer
 
-- This repository does not include any original or modified source code of the TIDAL desktop app.
+- [TIDAL Media Downloader disclaimer](https://github.com/yaronzz/Tidal-Media-Downloader#-disclaimer).
+- This repository does not distribute any original or modified source code of the TIDAL desktop app.
 - I am in no way responsible for account bans for using a modified client. Use the patcher at your own risk.
 
 ## Notes for devs
