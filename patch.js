@@ -123,8 +123,16 @@ function createDiscordRpcToggle(mainPath) {
 }
 
 function enableDevMenu(mainPath) {
-  const menuControllerFilePath = join(mainPath, 'menu/MenuController.js');
+  const menuPath = join(mainPath, 'menu');
+  const developerMenuFilePath = join(menuPath, 'developerMenu.js');
+  const menuControllerFilePath = join(menuPath, 'MenuController.js');
 
+  injectCode(developerMenuFilePath, [
+    {
+      reference: 'id: _MenuEventEnum.default.SHOW_RENDERER_DEVTOOLS',
+      code: `accelerator: 'Ctrl+Shift+I',`,
+    }
+  ]);
   injectCode(menuControllerFilePath, [
     {
       reference: /process.env.NODE_ENV === 'development'/g,
@@ -155,7 +163,7 @@ function addGithubToHelpMenu(mainPath) {
         enabled: true,
         type: 'normal',
         click: delegate.menuClick.bind(delegate)
-      }, {`
+      }, {`,
     }
   ]);
   injectCode(menuControllerFilePath, [
@@ -163,7 +171,7 @@ function addGithubToHelpMenu(mainPath) {
       reference: 'case _MenuEventEnum.default.SUPPORT:',
       code: `case _MenuEventEnum.default.TEP_GITHUB:
         _electron.shell.openExternal('https://github.com/nekusu/tidal-enhanced-patcher');
-        break;`
+        break;`,
     }
   ]);
   console.log('TEP Github link added to help menu successfully');
