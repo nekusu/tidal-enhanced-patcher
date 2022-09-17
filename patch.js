@@ -135,6 +135,40 @@ function enableDevMenu(mainPath) {
   console.log('Dev menu enabled successfully');
 }
 
+function addGithubToHelpMenu(mainPath) {
+  const menuPath = join(mainPath, 'menu');
+  const menuEventEnumFilePath = join(menuPath, 'MenuEventEnum.js');
+  const helpMenuFilePath = join(menuPath, 'helpMenu.js');
+  const menuControllerFilePath = join(menuPath, 'MenuController.js');
+
+  injectCode(menuEventEnumFilePath, [
+    {
+      reference: 'MenuEvent["SUPPORT"]',
+      code: 'MenuEvent["TEP_GITHUB"] = "tep.github";',
+    }
+  ]);
+  injectCode(helpMenuFilePath, [
+    {
+      reference: `label: settings.locale.data['t-support']`,
+      code: `label: 'TIDAL Enhanced Github',
+        id: _MenuEventEnum.default.TEP_GITHUB,
+        enabled: true,
+        type: 'normal',
+        click: delegate.menuClick.bind(delegate)
+      }, {`
+    }
+  ]);
+  injectCode(menuControllerFilePath, [
+    {
+      reference: 'case _MenuEventEnum.default.SUPPORT:',
+      code: `case _MenuEventEnum.default.TEP_GITHUB:
+        _electron.shell.openExternal('https://github.com/nekusu/tidal-enhanced-patcher');
+        break;`
+    }
+  ]);
+  console.log('TEP Github link added to help menu successfully');
+}
+
 async function createAsarPackage(appResourcesPath, asarFilePath, sourcePath) {
   // renaming the file may cause data loss when an error occurs, copying the file is preferred
   // renameSync(asarFilePath, join(appResourcesPath, 'app_original.asar'));
@@ -168,6 +202,7 @@ async function main() {
   createDiscordRpcSetting(mainPath);
   createDiscordRpcToggle(mainPath);
   enableDevMenu(mainPath);
+  addGithubToHelpMenu(mainPath);
   await createAsarPackage(appResourcesPath, asarFilePath, sourcePath);
   console.log('TIDAL patched successfully');
 }
