@@ -12,9 +12,11 @@ import {
   writeFileSync,
 } from 'fs';
 import { promisify } from 'util';
+import { lookup as _lookup } from 'ps-node';
 import { join } from 'path';
 
 const exec = (command) => promisify(_exec)(command);
+const lookup = (query) => promisify(_lookup)(query);
 
 const DEFAULT_TIDAL_PATH = join(process.env.APPDATA ?? '', '../Local/TIDAL');
 let tidalPath = DEFAULT_TIDAL_PATH;
@@ -28,9 +30,8 @@ function isWindowsPlatform() {
 }
 
 async function isAppRunning() {
-  const taskListCommand = 'tasklist /v /fi "IMAGENAME eq tidal.exe"';
-  const { stdout } = await exec(taskListCommand);
-  const isRunning = !stdout.includes('No tasks');
+  const programs = await lookup({ command: 'tidal' });
+  const isRunning = !!programs.length;
   if (isRunning) {
     console.error('Close the app before running the patcher!');
   }
