@@ -33,7 +33,7 @@ You can now access various development tools disabled by default in the producti
 **Only Windows platforms are supported.** [Node.js](https://github.com/coreybutler/nvm-windows) required.
 
 ```sh
-git clone git@github.com:nekusu/tidal-enhanced-patcher.git
+git clone https://github.com/nekusu/tidal-enhanced-patcher.git
 cd tidal-enhanced-patcher
 node patch
 ```
@@ -73,4 +73,4 @@ To manually extract the source code files run the following command:
 node extract
 ```
 
-`node_modules` are included in the repo due to a modification to the [asar npm package](https://www.npmjs.com/package/asar) `(asar/lib/asar.js:187)`. This change will avoid errors with .symlink files located in `[source]/resources/osx` when extracting the asar archive.
+`node_modules` are included in the repo due to a modification to the [asar npm package](https://www.npmjs.com/package/asar) [(asar/lib/asar.js:187)](https://github.com/nekusu/tidal-enhanced-patcher/blob/main/node_modules/asar/lib/asar.js#L187). This change will avoid errors with .symlink files located in `[source]/resources/osx` when extracting the asar archive. See [electron/asar#50](https://github.com/electron/asar/issues/50).
