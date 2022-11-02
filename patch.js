@@ -91,7 +91,7 @@ function createDiscordRpcSetting(mainPath) {
   console.log('Discord RPC setting created');
 }
 
-function createDiscordRpcToggle(mainPath) {
+function modifyTrayMenu(mainPath) {
   const mainControllerFilePath = join(mainPath, 'app/MainController.js');
   const windowControllerFilePath = join(mainPath, 'window/WindowController.js');
 
@@ -112,8 +112,36 @@ function createDiscordRpcToggle(mainPath) {
     reference: 'this.applicationDelegate =',
     code: 'this.userSettingsController = userSettingsController;',
   }, {
-    reference: `type: 'separator'`,
-    code: `label: 'Discord Rich Presence',
+    reference: 'this.setThumbBarButtons(!!isPlaying);',
+    code: 'this.buildTrayMenu(!!isPlaying);',
+  }, {
+    reference: 'this.buildTrayMenu();',
+    code: 'this.buildTrayMenu(false);',
+    replace: true,
+  }, {
+    reference: 'buildTrayMenu() {',
+    code: 'buildTrayMenu(isPlaying) {',
+    replace: true,
+  }, {
+    reference: 'label: isVisible ? bundle.data',
+    code: `label: isPlaying ? bundle.data['t-pause'] : bundle.data['t-play'],
+      click: () => {
+        if (isPlaying) {
+          playbackActions.pause();
+        } else {
+          playbackActions.resume();
+        }
+      },
+    }, {
+      label: bundle.data['t-previous'],
+      click: () => playbackActions.playPrevious(),
+    }, {
+      label: bundle.data['t-next'],
+      click: () => playbackActions.playNext(),
+    }, {
+      type: 'separator',
+    }, {
+      label: 'Discord Rich Presence',
       type: 'checkbox',
       checked: !this.userSettingsController.get(_UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED),
       click: () => {
@@ -123,7 +151,7 @@ function createDiscordRpcToggle(mainPath) {
       }
     }, {`,
   }]);
-  console.log('Discord RPC toggle created');
+  console.log('Tray menu modified');
 }
 
 function enableDevMenu(mainPath) {
@@ -246,7 +274,7 @@ async function main() {
   installDiscordRpcLib(sourcePath);
   createDiscordActivity(mainPath);
   createDiscordRpcSetting(mainPath);
-  createDiscordRpcToggle(mainPath);
+  modifyTrayMenu(mainPath);
   enableDevMenu(mainPath);
   await downloadTidalDl();
   addDownloadMenu(mainPath);
