@@ -1,6 +1,7 @@
 import asar from 'asar';
 import { exec as _exec } from 'child_process';
 import { get } from 'https';
+import { getFileProperties } from 'get-file-properties'
 import {
   access,
   constants,
@@ -20,6 +21,14 @@ const lookup = (query) => promisify(_lookup)(query);
 
 const DEFAULT_TIDAL_PATH = join(process.env.APPDATA ?? '', '../Local/TIDAL');
 let tidalPath = DEFAULT_TIDAL_PATH;
+
+const TIDAL_VERSION = await getFileProperties(join(tidalPath, 'TIDAL.exe')).then((data) => {
+  return data.Version
+}).catch((err) => {
+  console.info("TIDAL version not found from file properties.")
+  console.info("Using old app directory discover method.");
+  return null
+})
 
 function isWindowsPlatform() {
   const isWindows = process.platform === 'win32';
@@ -49,10 +58,19 @@ function existsInDefaultPath() {
 }
 
 function getAppDirName() {
+  if (TIDAL_VERSION) {
+      const appVersionedDirName = `app-${TIDAL_VERSION.split('.').slice(0, 3).join('.')}`;
+      const appVersionedPath = join(tidalPath, appVersionedDirName);
+      if (existsSync(appVersionedPath)) {
+        console.log(`App directory: ${appVersionedDirName}`);
+        return appVersionedDirName;
+      }
+  }
+
   const appDirName = readdirSync(tidalPath, { withFileTypes: true })
-    .filter((dirent) => dirent.isDirectory())
-    .find((dirent) => dirent.name.startsWith('app'))
-    .name;
+  .filter((dirent) => dirent.isDirectory())
+  .find((dirent) => dirent.name.startsWith("app"))
+  .name;
   console.log(`App directory: ${appDirName}`);
   return appDirName;
 }
