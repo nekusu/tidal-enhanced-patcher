@@ -7,6 +7,7 @@
   "private": true,
   "dependencies": {
     "asar": "https://github.com/nekusu/asar/tarball/fix-get-node",
+    "get-file-properties": "^1.0.1",
     "ps-node": "^0.1.6"
   }
 }
