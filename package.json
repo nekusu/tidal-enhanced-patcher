@@ -6,8 +6,20 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "asar": "https://github.com/nekusu/asar/tarball/fix-get-node",
-    "get-file-properties": "^1.0.1",
-    "ps-node": "^0.1.6"
+    "@clack/prompts": "^0.7.0",
+    "@electron/asar": "^3.2.13",
+    "find-process": "^1.4.7",
+    "nano-spawn": "^0.1.0",
+    "original-fs": "^1.2.0",
+    "win-version-info": "^6.0.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.2",
+    "@types/bun": "latest",
+    "@types/win-version-info": "^3.1.3",
+    "typescript": "^5.6.2"
+  },
+  "patchedDependencies": {
+    "@electron/asar@3.2.13": "patches/@electron%2Fasar@3.2.13.patch"
   }
 }

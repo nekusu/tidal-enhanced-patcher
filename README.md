@@ -4,7 +4,7 @@
   <img src="./assets/tidal-enhanced-icon.png" width="220" />
 </p>
 
-TIDAL Enhanced Patcher is a simple script that allows you to extend the functionality of the TIDAL desktop app by modifying the [ASAR archive](https://www.electronjs.org/docs/latest/tutorial/asar-archives).
+**TIDAL Enhanced Patcher** is a tool designed to easily extend the functionality of the TIDAL desktop app by modifying its [ASAR archive](https://www.electronjs.org/docs/latest/tutorial/asar-archives).
 
 ## Features
 
@@ -34,39 +34,49 @@ You can now access various development tools disabled by default in the producti
 
 ## Usage
 
-**Only Windows platforms are supported.** [Node.js](https://github.com/coreybutler/nvm-windows) required.
+**Only Windows platforms are supported.**
 
-```sh
-git clone https://github.com/nekusu/tidal-enhanced-patcher.git
-cd tidal-enhanced-patcher
-npm i
-node patch
-```
+**Requirements:**
+You need to have [Bun](https://github.com/oven-sh/bun) and [npm](https://github.com/Schniz/fnm) installed on your system.
 
-The script will automatically find the app path, extract the source code, patch it, and create the asar package. A backup of the original file will be created.
+### Installation
+
+1. Clone the repository:
+    ```sh
+    git clone https://github.com/nekusu/tidal-enhanced-patcher.git
+    cd tidal-enhanced-patcher
+    ```
+
+2. Install dependencies using Bun:
+    ```sh
+    bun i
+    ```
+
+3. Run the interactive CLI:
+    ```sh
+    bun main.ts
+    ```
+
+### CLI
+
+The interactive CLI provides three main options: **patching**, **unpatching**, and **extracting source files**.
+
+#### 1. Patching TIDAL
+
+- The patcher will automatically detect whether TIDAL is running and find the executable.
+- If the app is already patched, it will first **unpatch** the existing modifications and proceed with patching again.
+- A backup of the original asar file is saved and the app is re-bundled.
+
+#### 2. Unpatching TIDAL
+
+- The patcher will revert all changes made to the app, restoring the original asar file and its content.
+- Alternatively, you can also go to `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\resources`, remove the `app.asar` file, and rename the `app_original.asar` file to `app.asar`.
+
+#### 3. Extracting Source Files
+
+- The patcher will extract the source files from the `.asar` archive.
 
 **App updates will sometimes require running the patcher again.**
-
-You can undo the changes by running the following command:
-
-```sh
-node unpatch
-```
-
-Alternatively, you can go to `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\resources`, remove the `app.asar` file, and rename the `app_original.asar` file to `app.asar`.
-
-To manually extract the source code files use:
-
-```sh
-node extract
-```
-
-## Roadmap
-
-- [x] Discord RPC toggle in system tray menu.
-- [x] Integration with [Tidal-Media-Downloader](https://github.com/yaronzz/Tidal-Media-Downloader).
-- [ ] Auto-patch source code after an app update.
-- [ ] MacOS support (?).
 
 ## Disclaimer
 

@@ -1,0 +1,27 @@
+diff --git a/lib/filesystem.js b/lib/filesystem.js
+index 76361d5423d226c9d5f15ac7b737e4e23a339349..564073b877c11c11247e1217ef861042b45fca70 100644
+--- a/lib/filesystem.js
++++ b/lib/filesystem.js
+@@ -162,9 +162,12 @@ class Filesystem {
+         fillFilesFromMetadata('/', this.header);
+         return files;
+     }
+-    getNode(p) {
++    getNode(p, followLinks = true) {
+         const node = this.searchNodeFromDirectory(path.dirname(p));
+         const name = path.basename(p);
++        if ('link' in node && followLinks) {
++          return this.getNode(path.join(node.link, name));
++        }
+         if (name) {
+             return node.files[name];
+         }
+@@ -173,7 +176,7 @@ class Filesystem {
+         }
+     }
+     getFile(p, followLinks = true) {
+-        const info = this.getNode(p);
++        const info = this.getNode(p, followLinks);
+         if (!info) {
+             throw new Error(`"${p}" was not found in this archive`);
+         }
