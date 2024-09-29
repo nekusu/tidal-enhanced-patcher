@@ -10,25 +10,25 @@
 
 ### Discord Rich Presence integration
 
-<img src="./assets/discord-rpc.png" width="310" />
+<img src="./assets/discord-rpc.png" width="400" />
 
 Unlike many other [awesome repositories](https://github.com/search?q=tidal+discord) trying to address the lack of official Discord RPC integration, TEP directly modifies the source code so there is no need to run scripts in the background, reverse engineer the TIDAL API, or use third-party APIs. A native-like experience!
 
 ### Download your favorite music
 
-<img src="./assets/download-menu.png" width="310" />
+<img src="./assets/download-menu.png" width="300" />
 
 TIDAL Enhanced allows you to download music and videos in the highest quality directly from TIDAL thanks to the [Media Downloader](https://github.com/yaronzz/Tidal-Media-Downloader) app, just paste the track/album/artist link in the downloader and enjoy your offline music!
 
 ### Improved system tray menu
 
-<img src="./assets/system-tray.png" width="310" />
+<img src="./assets/system-tray.png" width="300" />
 
 Playback controls and a Discord RPC switch can be quickly accessed from the system tray menu.
 
 ### Developer menu enabled
 
-<img src="./assets/dev-menu.png" width="310" />
+<img src="./assets/dev-menu.png" width="300" />
 
 You can now access various development tools disabled by default in the production build.
 
@@ -37,7 +37,7 @@ You can now access various development tools disabled by default in the producti
 **Only Windows platforms are supported.**
 
 **Requirements:**
-You need to have [Bun](https://github.com/oven-sh/bun) and [npm](https://github.com/Schniz/fnm) installed on your system.
+You need to have [Bun](https://github.com/oven-sh/bun#install) and [npm](https://github.com/Schniz/fnm#using-winget-windows) installed on your system.
 
 ### Installation
 
@@ -74,7 +74,7 @@ The interactive CLI provides three main options: **patching**, **unpatching**, a
 
 #### 3. Extracting Source Files
 
-- The patcher will extract the source files from the `.asar` archive.
+- The patcher will extract the source files from the asar archive.
 
 **App updates will sometimes require running the patcher again.**
 
