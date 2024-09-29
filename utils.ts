@@ -57,7 +57,7 @@ export async function getAppDirName() {
   }
 }
 
-export async function waitForTimoeout(timeout = 100) {
+export async function waitForTimeout(timeout = 100) {
   return new Promise((resolve) => setTimeout(resolve, timeout));
 }
 
@@ -68,7 +68,7 @@ export async function extractSourceFiles(asarFilePath: string, sourcePath: strin
     await rm(sourcePath, { recursive: true, force: true });
     // ensures that the spinner appears, although it will get stuck because asar.extractAll()
     // is synchronous
-    await waitForTimoeout(100);
+    await waitForTimeout();
     asar.extractAll(asarFilePath, sourcePath);
     s.stop('Source files extracted');
   } catch (error) {

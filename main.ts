@@ -9,6 +9,7 @@ import {
   isAppRunning,
   isWindowsPlatform,
   tidalPath,
+  waitForTimeout,
 } from './utils';
 
 const scripts = { patch, unpatch, extract };
@@ -43,6 +44,7 @@ async function main() {
     await scripts[script as keyof typeof scripts](appResourcesPath);
     if (await confirm({ message: 'Exit?' })) {
       outro('✨ Thank you for using TIDAL Enhanced Patcher!');
+      await waitForTimeout(1000);
       break;
     }
   }
