@@ -12,7 +12,7 @@ export async function extract(appResourcesPath: string) {
     const pathToExtract = asarFilePath;
     // let pathToExtract = asarFilePath;
     if (await exists(originalAsarFilePath)) {
-      log.info('TIDAL is patched. Patched asar file will be extracted');
+      log.warn('TIDAL is patched. Patched asar file will be extracted instead');
 
       // extracting from app_original.asar fails for some reason
       // const file = await select({

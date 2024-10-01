@@ -1,13 +1,16 @@
 import { createWriteStream } from 'node:fs';
-import { exists, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { exists, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import type { ReadableStream } from 'node:stream/web';
+import { promisify } from 'node:util';
 import { log, spinner } from '@clack/prompts';
 import asar from '@electron/asar';
+import AdmZip from 'adm-zip';
 import findProcess from 'find-process';
 import versionInfo from 'win-version-info';
 
+const NODEJS_DIST_URL = 'https://nodejs.org/dist';
 const DEFAULT_TIDAL_PATH = join(import.meta.env.APPDATA ?? '', '../Local/TIDAL');
 const EXECUTABLE_NAME = 'TIDAL.exe';
 export const tidalPath = DEFAULT_TIDAL_PATH;
@@ -38,8 +41,8 @@ export async function existsInDefaultPath() {
 export async function getAppDirName() {
   let appVersionDirName: string | undefined;
   try {
-    const TIDAL_VERSION = versionInfo(join(tidalPath, EXECUTABLE_NAME)).FileVersion;
-    if (TIDAL_VERSION) appVersionDirName = `app-${TIDAL_VERSION.split('.').slice(0, 3).join('.')}`;
+    const appVersion = versionInfo(join(tidalPath, EXECUTABLE_NAME)).FileVersion;
+    if (appVersion) appVersionDirName = `app-${appVersion.split('.').slice(0, 3).join('.')}`;
     else {
       const appDirName = await readdir(tidalPath, { withFileTypes: true });
       appVersionDirName = appDirName
@@ -124,9 +127,45 @@ export async function injectCode(filePath: string, modifications: Modifications[
 export async function download(url: string, outputPath: string) {
   const response = await fetch(url);
   if (response.ok && response.body) {
-    const writer = createWriteStream(outputPath);
+    const writeStream = createWriteStream(outputPath);
     // type error: https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/65542#discussioncomment-6071004
     const body = response.body as unknown as ReadableStream<Uint8Array>;
-    Readable.fromWeb(body).pipe(writer);
+    Readable.fromWeb(body).pipe(writeStream);
+    return new Promise((resolve, reject) => {
+      writeStream.on('error', reject);
+      writeStream.on('close', resolve);
+    });
+  }
+}
+
+export async function downloadNpm(outputPath = 'node') {
+  let latestVersion: string | undefined;
+  const s = spinner();
+  s.start('Downloading npm from nodejs.org...');
+  try {
+    const response = await fetch(`${NODEJS_DIST_URL}/index.json`);
+    const versions = await response.json();
+    latestVersion = versions[0].version;
+    const downloadURL = `${NODEJS_DIST_URL}/${latestVersion}/node-${latestVersion}-win-x64.zip`;
+    await rm('node.zip', { force: true });
+    await download(downloadURL, 'node.zip');
+    s.stop('npm downloaded');
+  } catch (error) {
+    s.stop('Error downloading npm', 2);
+    throw error;
+  }
+  const s2 = spinner();
+  s2.start('Extracting npm...');
+  try {
+    const zip = new AdmZip('node.zip');
+    const extractAllTo = promisify(zip.extractAllToAsync.bind(zip));
+    await extractAllTo('', true, false);
+    await rm(outputPath, { force: true });
+    await rename(`node-${latestVersion}-win-x64`, outputPath);
+    await rm('node.zip');
+    s2.stop('npm extracted');
+  } catch (error) {
+    s2.stop('Error extracting npm', 2);
+    throw error;
   }
 }

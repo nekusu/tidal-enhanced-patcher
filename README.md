@@ -36,10 +36,25 @@ You can now access various development tools disabled by default in the producti
 
 **Only Windows platforms are supported.**
 
-**Requirements:**
-You need to have [Bun](https://github.com/oven-sh/bun#install) and [npm](https://github.com/Schniz/fnm#using-winget-windows) installed on your system.
+**Note:** App updates may require running the patcher again.
 
-### Installation
+### Using the Precompiled Executable
+
+For users who prefer to download and run the patcher without setting up the development environment.
+
+1. Download the executable:
+   - Go to the [Releases](https://github.com/nekusu/tidal-enhanced-patcher/releases) page and download the `TIDALEnhancedPatcher.exe` file.
+
+2. Run the patcher:
+   - Double-click the downloaded file to launch the interactive CLI.
+
+### Running from Source Code
+
+For developers or users who want to run it directly from the source.
+
+**Requirements:** You need to have [Bun](https://github.com/oven-sh/bun#install) installed on your system.
+
+#### Installation
 
 1. Clone the repository:
     ```sh
@@ -56,8 +71,13 @@ You need to have [Bun](https://github.com/oven-sh/bun#install) and [npm](https:/
     ```sh
     bun main.ts
     ```
+    **Alternatively, you can also build and run the executable** by running:
+    ```sh
+    bun run build
+    .\TIDALEnhancedPatcher.exe
+    ```
 
-### CLI
+### CLI Features
 
 The interactive CLI provides three main options: **patching**, **unpatching**, and **extracting source files**.
 
@@ -65,18 +85,16 @@ The interactive CLI provides three main options: **patching**, **unpatching**, a
 
 - The patcher will automatically detect whether TIDAL is running and find the executable.
 - If the app is already patched, it will first **unpatch** the existing modifications and proceed with patching again.
-- A backup of the original asar file is saved and the app is re-bundled.
+- A backup of the original asar file is saved, and the app is re-bundled.
 
 #### 2. Unpatching TIDAL
 
-- The patcher will revert all changes made to the app, restoring the original asar file and its content.
-- Alternatively, you can also go to `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\resources`, remove the `app.asar` file, and rename the `app_original.asar` file to `app.asar`.
+- The patcher will revert all changes made to the app, restoring the original asar file.
+- Alternatively, you can go to `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\resources`, remove the `app.asar` file, and rename the `app_original.asar` file to `app.asar`.
 
 #### 3. Extracting Source Files
 
 - The patcher will extract the source files from the asar archive.
-
-**App updates will sometimes require running the patcher again.**
 
 ## Disclaimer
 

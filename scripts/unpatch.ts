@@ -9,7 +9,7 @@ export async function unpatch(appResourcesPath: string) {
   try {
     if (!(await exists(originalAsarFilePath))) throw new Error('Original asar file not found');
     await rm(asarFilePath);
-    await rename(join(appResourcesPath, 'app_original.asar'), asarFilePath);
+    await rename(originalAsarFilePath, asarFilePath);
     log.success('TIDAL unpatched successfully');
   } catch (error) {
     log.error((error as Error).message);

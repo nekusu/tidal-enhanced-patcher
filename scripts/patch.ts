@@ -1,42 +1,80 @@
 import { copyFile, exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { cancel, confirm, isCancel, log, spinner } from '@clack/prompts';
+import { confirm, isCancel, log, select, spinner, text } from '@clack/prompts';
 import asar from '@electron/asar';
-import spawn from 'nano-spawn';
-import { download, extractSourceFiles, injectCode, tidalPath } from '../utils';
+import { execa } from 'execa';
+import DiscordActivity from '../files/DiscordActivity.js' with { type: 'text' };
+import downloadMenu from '../files/downloadMenu.js' with { type: 'text' };
+import { download, downloadNpm, extractSourceFiles, injectCode, tidalPath } from '../utils';
 import { unpatch } from './unpatch';
-
-// alternative way of writing the files to the filesystem
-// import DiscordActivity from '../files/DiscordActivity.js' with { type: 'text' };
-// import downloadMenu from '../files/downloadMenu.js' with { type: 'text' };
 
 const DISCORD_CLIENT_ID = '1004259730526584873';
 const TIDAL_DL_EXE_URL =
   'https://github.com/yaronzz/Tidal-Media-Downloader/raw/master/TIDALDL-PY/exe/tidal-dl.exe';
 
-async function checkNPM() {
-  const s = spinner();
-  s.start('Checking if npm is installed...');
+async function checkNpmInstallation() {
+  let npmPath: string | undefined;
   try {
-    const { stdout, stderr } = await spawn('npm', ['--version']);
-    if (stderr) throw new Error(stderr);
-    s.stop(`npm installed: v${stdout}`);
+    const { stdout, stderr } = await execa({ reject: false })`where.exe npm`;
+    if (stderr) {
+      const downloadedNpmPath = join(process.cwd(), 'node/npm.cmd');
+      if (await exists(downloadedNpmPath)) npmPath = downloadedNpmPath;
+      else throw new Error(stderr);
+    }
+    npmPath = stdout.split('\n')[0];
+    log.info(`Using npm from: ${npmPath}`);
   } catch (error) {
-    s.stop('npm is not installed', 2);
+    log.error(`npm could not be found: ${(error as Error).message}`);
+    const option = await select({
+      message: 'Select an option:',
+      options: [
+        {
+          value: 'download',
+          label: 'Download npm',
+          hint: 'Select if you do not have npm installed',
+        },
+        {
+          value: 'path',
+          label: 'Enter npm path manually',
+          hint: 'Select if you have npm installed but it was not found',
+        },
+      ],
+    });
+    if (isCancel(option)) throw new Error('Cancelled');
+    if (option === 'download') {
+      await downloadNpm();
+      return await checkNpmInstallation();
+    }
+    const manualNpmPath = await text({
+      message: 'Enter path',
+      placeholder: `C:\\Users\\${import.meta.env.USERNAME}\\AppData\\Roaming\\npm\\npm.cmd`,
+    });
+    if (isCancel(manualNpmPath)) throw new Error('Cancelled');
+    npmPath = manualNpmPath;
+  }
+  try {
+    const { stdout: npmVersion } = await execa`${npmPath} -v`;
+    log.info(`npm version: ${npmVersion}`);
+  } catch (error) {
+    log.error('Error checking npm version');
     throw error;
   }
+  return npmPath;
 }
 
-async function installDiscordRpcPackage(sourcePath: string) {
+async function installDiscordRpcPackage(sourcePath: string, npmPath: string) {
   const s = spinner();
-  s.start('Installing discord-rpc package...');
+  s.start('Installing @xhayper/discord-rpc package...');
   try {
-    const { stderr } = await spawn('npm', ['i', '@xhayper/discord-rpc'], { cwd: sourcePath });
-    if (stderr.includes('error')) throw new Error(stderr);
-    s.stop('discord-rpc package installed');
-    if (stderr.includes('warn')) log.warn(stderr);
+    const { stderr } = await execa({
+      cwd: sourcePath,
+      reject: false,
+    })`${npmPath} i @xhayper/discord-rpc`;
+    if (stderr.includes('npm err')) throw new Error(stderr);
+    s.stop('@xhayper/discord-rpc package installed');
+    if (stderr.includes('npm warn')) log.warn(stderr);
   } catch (error) {
-    s.stop('Error installing discord-rpc package', 2);
+    s.stop('Error installing @xhayper/discord-rpc package', 2);
     throw error;
   }
 }
@@ -46,7 +84,7 @@ async function downloadTidalDl() {
   const tidalDlExePath = join(tidalPath, 'tidal-dl.exe');
 
   if (await exists(tidalDlExePath))
-    log.info('Tidal Media Downloader already exists. Skipping download...');
+    log.info('Tidal Media Downloader already exists. Download skipped');
   else {
     const s = spinner();
     s.start('Downloading Tidal Media Downloader...');
@@ -87,15 +125,14 @@ async function downloadTidalDl() {
 
 async function createDiscordActivity(mainPath: string) {
   const discordScriptPath = join(mainPath, 'discord');
-  const discordActivityFileName = './files/DiscordActivity.js';
+  const discordActivityFileName = 'DiscordActivity.js';
   const mainControllerFilePath = join(mainPath, 'app/MainController.js');
 
   await mkdir(discordScriptPath);
-  // await writeFile(
-  //   join(discordScriptPath, discordActivityFileName),
-  //   DiscordActivity as unknown as string,
-  // );
-  await copyFile(discordActivityFileName, join(discordScriptPath, 'DiscordActivity.js'));
+  await writeFile(
+    join(discordScriptPath, discordActivityFileName),
+    DiscordActivity as unknown as string,
+  );
   await injectCode(mainControllerFilePath, [
     {
       reference: /var _electron/,
@@ -280,10 +317,9 @@ async function addDownloadMenu(mainPath: string) {
   const menuPath = join(mainPath, 'menu');
   const menuEventEnumFilePath = join(menuPath, 'MenuEventEnum.js');
   const menuControllerFilePath = join(menuPath, 'MenuController.js');
-  const downloadMenuFileName = './files/downloadMenu.js';
+  const downloadMenuFileName = 'downloadMenu.js';
 
-  // await writeFile(join(menuPath, downloadMenuFileName), downloadMenu as unknown as string);
-  await copyFile(downloadMenuFileName, join(menuPath, 'downloadMenu.js'));
+  await writeFile(join(menuPath, downloadMenuFileName), downloadMenu as unknown as string);
   await injectCode(menuEventEnumFilePath, [
     {
       reference: /MenuEvent\["NAVIGATION"\]/,
@@ -342,7 +378,7 @@ async function bundleAsarPackage(
     throw error;
   } finally {
     const shouldRemove = await confirm({ message: 'Remove source files? (recommended)' });
-    if (isCancel(shouldRemove)) cancel('Operation cancelled');
+    if (isCancel(shouldRemove)) log.error('Cancelled');
     else if (shouldRemove) {
       const s = spinner();
       s.start('Removing source files...');
@@ -360,21 +396,21 @@ export async function patch(appResourcesPath: string) {
 
   try {
     if (await exists(originalAsarFilePath)) {
-      log.info('TIDAL is already patched. Unpatching...');
+      log.warn('TIDAL is already patched');
       await unpatch(appResourcesPath);
     }
+    const npmPath = await checkNpmInstallation();
     await extractSourceFiles(asarFilePath, sourcePath);
-    await checkNPM();
-    await installDiscordRpcPackage(sourcePath);
+    await installDiscordRpcPackage(sourcePath, npmPath);
     await createDiscordActivity(mainPath);
     await createDiscordRpcSetting(mainPath);
     await modifyTrayMenu(mainPath);
     await addLinksToHelpMenu(mainPath);
     const shouldEnableDevMenu = await confirm({ message: 'Enable dev menu?' });
-    if (isCancel(shouldEnableDevMenu)) cancel('Operation cancelled');
+    if (isCancel(shouldEnableDevMenu)) log.error('Cancelled');
     else if (shouldEnableDevMenu) await enableDevMenu(mainPath);
     const shouldDownload = await confirm({ message: 'Download TIDAL Media Downloader?' });
-    if (isCancel(shouldDownload)) cancel('Operation cancelled');
+    if (isCancel(shouldDownload)) log.error('Cancelled');
     else if (shouldDownload) {
       await downloadTidalDl();
       await addDownloadMenu(mainPath);
