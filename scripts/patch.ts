@@ -16,12 +16,12 @@ async function checkNpmInstallation() {
   let npmPath: string | undefined;
   try {
     const { stdout, stderr } = await execa({ reject: false })`where.exe npm`;
+    npmPath = stdout.split('\n')[0];
     if (stderr) {
       const downloadedNpmPath = join(process.cwd(), 'node/npm.cmd');
       if (await exists(downloadedNpmPath)) npmPath = downloadedNpmPath;
       else throw new Error(stderr);
     }
-    npmPath = stdout.split('\n')[0];
     log.info(`Using npm from: ${npmPath}`);
   } catch (error) {
     log.error(`npm could not be found: ${(error as Error).message}`);
