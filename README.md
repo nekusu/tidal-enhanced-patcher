@@ -43,10 +43,10 @@ You can now access various development tools disabled by default in the producti
 For users who prefer to download and run the patcher without setting up the development environment.
 
 1. Download the executable:
-   - Go to the [Releases](https://github.com/nekusu/tidal-enhanced-patcher/releases) page and download the `TIDALEnhancedPatcher.exe` file.
+   - Go to the [Releases](https://github.com/nekusu/tidal-enhanced-patcher/releases) page and download the `TIDALEnhancedPatcher.zip` file.
 
 2. Run the patcher:
-   - Double-click the downloaded file to launch the interactive CLI.
+   - Extract the downloaded file and double-click the executable to launch the interactive CLI.
 
 ### Running from Source Code
 
