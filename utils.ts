@@ -7,8 +7,8 @@ import { promisify } from 'node:util';
 import { log, spinner } from '@clack/prompts';
 import asar from '@electron/asar';
 import AdmZip from 'adm-zip';
+import { execa } from 'execa';
 import findProcess from 'find-process';
-import versionInfo from 'win-version-info';
 
 const NODEJS_DIST_URL = 'https://nodejs.org/dist';
 const DEFAULT_TIDAL_PATH = join(import.meta.env.APPDATA ?? '', '../Local/TIDAL');
@@ -39,9 +39,17 @@ export async function existsInDefaultPath() {
 }
 
 export async function getAppDirName() {
-  let appVersionDirName: string | undefined;
+  let appVersion: string | undefined;
   try {
-    const appVersion = versionInfo(join(tidalPath, EXECUTABLE_NAME)).FileVersion;
+    const { stdout } = await execa({
+      shell: 'powershell',
+    })`(Get-Item '${join(tidalPath, EXECUTABLE_NAME)}').VersionInfo | ConvertTo-Json`;
+    appVersion = JSON.parse(stdout).FileVersion;
+  } catch (error) {
+    log.warn(`Error getting app version: ${(error as Error).message}`);
+  }
+  try {
+    let appVersionDirName: string | undefined;
     if (appVersion) appVersionDirName = `app-${appVersion.split('.').slice(0, 3).join('.')}`;
     else {
       const appDirName = await readdir(tidalPath, { withFileTypes: true });
@@ -55,8 +63,7 @@ export async function getAppDirName() {
     }
     log.error('App directory not found');
   } catch (error) {
-    log.error('Error looking for app directory');
-    log.error((error as Error).message);
+    log.error(`Error looking for app directory: ${(error as Error).message}`);
   }
 }
 

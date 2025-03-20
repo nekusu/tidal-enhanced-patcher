@@ -14,8 +14,7 @@
     "adm-zip": "^0.5.16",
     "execa": "^9.5.2",
     "find-process": "^1.4.10",
-    "original-fs": "^1.2.0",
-    "win-version-info": "^6.0.1"
+    "original-fs": "^1.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
