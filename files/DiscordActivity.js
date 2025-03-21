@@ -18,6 +18,7 @@ class DiscordActivity {
     this.discordRpcDisabled = this.userSettingsController.get(
       _UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED,
     );
+    this.ready = false;
     this.mediaItem = null;
     this.songTime = 0;
     this.isPlaying = false;
@@ -25,16 +26,18 @@ class DiscordActivity {
 
     this.client.on('ready', () => {
       console.log('Discord RPC: Client ready');
+      this.ready = true;
+      if (this.mediaItem) this.updateActivity();
     });
+    this.client.on('disconnected', () => {
+      console.log('Discord RPC: Client disconnected');
+      this.ready = false;
+    });
+    this.login();
 
-    console.log('Discord RPC: Logging into client');
-    this.client.login().catch((error) => {
-      console.error('Discord RPC: Login failed ->', error);
-      console.log('Discord RPC: Retrying login in 5 seconds...');
-      setTimeout(() => {
-        this.client.login().catch((error) => console.error('Discord RPC: Login failed ->', error));
-      }, 5000).unref();
-    });
+    setInterval(() => {
+      if (!this.ready && !this.discordRpcDisabled) this.login();
+    }, 10000).unref();
 
     // Check every second if Discord RPC has been disabled from the system tray
     // Possible improvement: integrate discordRpcDisabled value with redux store and
@@ -44,10 +47,10 @@ class DiscordActivity {
         _UserSettingsKeysEnum.default.DISCORD_RPC_DISABLED,
       );
       if (this.discordRpcDisabled === disabled) return;
-      if (disabled) this.client.user?.clearActivity();
-      else this.debouncedUpdateActivity();
       console.log(`Discord RPC: ${disabled ? 'Disabled' : 'Enabled'} from system tray`);
       this.discordRpcDisabled = disabled;
+      if (disabled) this.client.user?.clearActivity();
+      else this.updateActivity();
     }, 1000);
 
     // Listen for media info
@@ -75,17 +78,27 @@ class DiscordActivity {
     });
 
     // Function debounced to prevent multiple calls when jumping to another song
-    // due to multiple `PLAYBACK_CURRENT_TIME` events
+    // due to multiple TIDAL events
     this.debouncedUpdateActivity = _.debounce(() => {
       this.updateActivity();
-    }, 200);
+    }, 1000);
+  }
+
+  login() {
+    this.client.login().catch((error) => {
+      console.error('Discord RPC: Login failed ->', error);
+    });
   }
 
   updateActivity() {
-    if (this.discordRpcDisabled) return;
+    if (!this.ready || this.discordRpcDisabled) return;
     console.log('Discord RPC: Updating activity');
     clearTimeout(this.activityTimeout);
 
+    const buttons = [
+      { label: 'Download TIDAL Enhanced', url: 'https://github.com/nekusu/tidal-enhanced-patcher' },
+    ];
+    if (this.mediaItem?.url) buttons.unshift({ label: 'Play on TIDAL', url: this.mediaItem?.url });
     const activity = {
       type: 2,
       details: this.mediaItem?.title,
@@ -94,21 +107,22 @@ class DiscordActivity {
       largeImageText: this.mediaItem?.album,
       smallImageKey: 'tidal',
       smallImageText: 'TIDAL Enhanced',
-      buttons: this.mediaItem?.url
-        ? [{ label: 'Play on TIDAL', url: this.mediaItem?.url }]
-        : undefined,
       instance: true,
+      buttons,
     };
 
     if (this.isPlaying) {
       const startTimestamp = Date.now() - this.songTime * 1000;
       activity.startTimestamp = startTimestamp;
       activity.endTimestamp = startTimestamp + this.mediaItem.duration * 1000;
-    } else
+    } else {
+      activity.startTimestamp = undefined;
+      activity.endTimestamp = undefined;
       this.activityTimeout = setTimeout(() => {
         console.log('Discord RPC: Activity cleared due to inactivity');
         this.client.user?.clearActivity();
-      }, 10000);
+      }, 60000).unref();
+    }
 
     this.client.user?.setActivity(activity).catch(console.error);
   }
