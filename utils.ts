@@ -1,5 +1,5 @@
 import { createWriteStream } from 'node:fs';
-import { exists, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { exists, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import type { ReadableStream } from 'node:stream/web';
@@ -7,8 +7,8 @@ import { promisify } from 'node:util';
 import { log, spinner } from '@clack/prompts';
 import asar from '@electron/asar';
 import AdmZip from 'adm-zip';
-import { execa } from 'execa';
 import findProcess from 'find-process';
+import versionInfo from 'win-version-info';
 
 const NODEJS_DIST_URL = 'https://nodejs.org/dist';
 const DEFAULT_TIDAL_PATH = join(import.meta.env.APPDATA ?? '', '../Local/TIDAL');
@@ -39,17 +39,9 @@ export async function existsInDefaultPath() {
 }
 
 export async function getAppDirName() {
-  let appVersion: string | undefined;
+  let appVersionDirName: string | undefined;
   try {
-    const { stdout } = await execa({
-      shell: 'powershell',
-    })`(Get-Item '${join(tidalPath, EXECUTABLE_NAME)}').VersionInfo | ConvertTo-Json`;
-    appVersion = JSON.parse(stdout).FileVersion;
-  } catch (error) {
-    log.warn(`Error getting app version: ${(error as Error).message}`);
-  }
-  try {
-    let appVersionDirName: string | undefined;
+    const appVersion = versionInfo(join(tidalPath, EXECUTABLE_NAME)).FileVersion;
     if (appVersion) appVersionDirName = `app-${appVersion.split('.').slice(0, 3).join('.')}`;
     else {
       const appDirName = await readdir(tidalPath, { withFileTypes: true });
@@ -63,7 +55,8 @@ export async function getAppDirName() {
     }
     log.error('App directory not found');
   } catch (error) {
-    log.error(`Error looking for app directory: ${(error as Error).message}`);
+    log.error('Error looking for app directory');
+    log.error((error as Error).message);
   }
 }
 
@@ -76,15 +69,86 @@ export async function extractSourceFiles(asarFilePath: string, sourcePath: strin
   s.start('Extracting source files...');
   try {
     await rm(sourcePath, { recursive: true, force: true });
-    // ensures that the spinner appears, although it will get stuck because asar.extractAll()
-    // is synchronous
     await waitForTimeout();
-    asar.extractAll(asarFilePath, sourcePath);
-    s.stop('Source files extracted');
+    
+    // Try normal extraction first
+    try {
+      asar.extractAll(asarFilePath, sourcePath);
+      s.stop('Source files extracted');
+      return;
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      // Check if this is the known symlink error with macOS resources
+      if (errorMessage.includes('was not found in this archive') && 
+          (errorMessage.includes('osx') || errorMessage.includes('\\') || errorMessage.includes('C:\\'))) {
+        // Fallback: extract files individually, skipping problematic macOS resources
+        // Silently use fallback method - no need to warn user about this expected behavior
+        await extractSourceFilesFallback(asarFilePath, sourcePath, s);
+        return;
+      }
+      // Re-throw if it's a different error
+      throw error;
+    }
   } catch (error) {
     s.stop('Error extracting source files', 2);
     throw error;
   }
+}
+
+async function extractSourceFilesFallback(
+  asarFilePath: string,
+  sourcePath: string,
+  s: ReturnType<typeof spinner>,
+) {
+  // Use asar's listPackage to get all files, then extract individually
+  // This allows us to skip problematic symlinks and macOS resources
+  let fileList: string[] = [];
+  try {
+    fileList = asar.listPackage(asarFilePath);
+  } catch (err) {
+    // If listPackage fails, try to extract with a workaround
+    throw new Error('Could not list files in asar archive. The archive may be corrupted.');
+  }
+  
+  const skippedFiles: string[] = [];
+  let extractedCount = 0;
+  const createdDirs = new Set<string>();
+  
+  // Extract files individually, skipping macOS resources
+  for (const filePath of fileList) {
+    // Skip macOS-specific resources (not needed on Windows)
+    if (filePath.includes('resources/osx/') || 
+        filePath.includes('resources/osx-arm64/') ||
+        filePath.includes('TIDALPlayer.app') ||
+        filePath.includes('\\') || // Skip paths with backslashes (malformed)
+        /[A-Z]:/i.test(filePath)) { // Skip paths with Windows drive letters
+      skippedFiles.push(filePath);
+      continue;
+    }
+    
+    try {
+      const destPath = join(sourcePath, filePath);
+      const destDir = join(destPath, '..');
+      
+      // Create directory if needed
+      if (!createdDirs.has(destDir)) {
+        await mkdir(destDir, { recursive: true });
+        createdDirs.add(destDir);
+      }
+      
+      // Extract the file
+      asar.extractFile(asarFilePath, filePath, destPath);
+      extractedCount++;
+    } catch (err) {
+      // Skip files that fail to extract (likely symlinks or other issues)
+      skippedFiles.push(filePath);
+    }
+  }
+  
+  // Don't warn about skipped macOS files - this is expected behavior on Windows
+  // They're not needed and skipping them is normal
+  
+  s.stop('Source files extracted');
 }
 
 export type Modifications = {

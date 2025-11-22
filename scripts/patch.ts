@@ -69,7 +69,7 @@ async function installDiscordRpcPackage(sourcePath: string, npmPath: string) {
     const { stderr } = await execa({
       cwd: sourcePath,
       reject: false,
-    })`${npmPath} i @xhayper/discord-rpc`;
+    })`${npmPath} i @xhayper/discord-rpc --legacy-peer-deps --silent`;
     if (stderr.includes('npm err')) throw new Error(stderr);
     s.stop('@xhayper/discord-rpc package installed');
     if (stderr.includes('npm warn')) log.warn(stderr);
