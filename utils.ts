@@ -22,11 +22,22 @@ export function isWindowsPlatform() {
 
 export async function isAppRunning() {
   const s = spinner();
+  let isRunning = true;
   s.start('Checking if TIDAL is running...');
-  const { stdout: count } = await execa({ shell: 'powershell' })`(Get-Process -Name TIDAL).Count`;
-  const isRunning = +count > 0;
-  if (isRunning) s.stop('Close the app before running the patcher!', 2);
-  else s.stop('TIDAL is not running');
+  try {
+    const { stdout: count } = await execa({ shell: 'powershell' })`(Get-Process -Name TIDAL).Count`;
+    isRunning = +count > 0;
+    if (isRunning) {
+      s.stop('TIDAL is currently running', 2);
+      s.start('Killing TIDAL process...');
+      await execa({ shell: 'powershell' })`Stop-Process -Name TIDAL`;
+      s.stop('TIDAL process killed');
+      isRunning = false;
+    } else s.stop('TIDAL is not running');
+  } catch (error) {
+    s.stop('Error checking if TIDAL is running', 2);
+    log.error((error as Error).message);
+  }
   return isRunning;
 }
 
