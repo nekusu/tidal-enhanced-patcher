@@ -8,7 +8,6 @@ import { log, spinner } from '@clack/prompts';
 import { extractAll } from '@electron/asar';
 import AdmZip from 'adm-zip';
 import { execa } from 'execa';
-import findProcess from 'find-process';
 
 const NODEJS_DIST_URL = 'https://nodejs.org/dist';
 const DEFAULT_TIDAL_PATH = join(import.meta.env.APPDATA ?? '', '../Local/TIDAL');
@@ -24,8 +23,8 @@ export function isWindowsPlatform() {
 export async function isAppRunning() {
   const s = spinner();
   s.start('Checking if TIDAL is running...');
-  const programs = await findProcess('name', EXECUTABLE_NAME);
-  const isRunning = !!programs.length;
+  const { stdout: count } = await execa({ shell: 'powershell' })`(Get-Process -Name TIDAL).Count`;
+  const isRunning = +count > 0;
   if (isRunning) s.stop('Close the app before running the patcher!', 2);
   else s.stop('TIDAL is not running');
   return isRunning;
