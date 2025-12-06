@@ -1,7 +1,7 @@
 import { copyFile, exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { confirm, isCancel, log, select, spinner, text } from '@clack/prompts';
-import asar from '@electron/asar';
+import { createPackage } from '@electron/asar';
 import { execa } from 'execa';
 import DiscordActivity from '../files/DiscordActivity.js' with { type: 'text' };
 import downloadMenu from '../files/downloadMenu.js' with { type: 'text' };
@@ -370,7 +370,7 @@ async function bundleAsarPackage(
   const s = spinner();
   s.start('Bundling asar package...');
   try {
-    await asar.createPackage(sourcePath, asarFilePath);
+    await createPackage(sourcePath, asarFilePath);
     s.stop('Asar package bundled');
   } catch (error) {
     await copyFile(originalAsarFilePath, asarFilePath);

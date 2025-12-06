@@ -1,11 +1,11 @@
 import { createWriteStream } from 'node:fs';
-import { exists, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { exists, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import type { ReadableStream } from 'node:stream/web';
 import { promisify } from 'node:util';
 import { log, spinner } from '@clack/prompts';
-import asar from '@electron/asar';
+import { extractAll } from '@electron/asar';
 import AdmZip from 'adm-zip';
 import { execa } from 'execa';
 import findProcess from 'find-process';
@@ -67,7 +67,7 @@ export async function getAppDirName() {
   }
 }
 
-export async function waitForTimeout(timeout = 100) {
+export function waitForTimeout(timeout = 100) {
   return new Promise((resolve) => setTimeout(resolve, timeout));
 }
 
@@ -79,7 +79,7 @@ export async function extractSourceFiles(asarFilePath: string, sourcePath: strin
     // ensures that the spinner appears, although it will get stuck because asar.extractAll()
     // is synchronous
     await waitForTimeout();
-    asar.extractAll(asarFilePath, sourcePath);
+    extractAll(asarFilePath, sourcePath);
     s.stop('Source files extracted');
   } catch (error) {
     s.stop('Error extracting source files', 2);

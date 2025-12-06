@@ -1,7 +1,11 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.3/schema.json",
-  "organizeImports": {
-    "enabled": true
+  "$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "formatter": {
     "enabled": true,
@@ -27,8 +31,13 @@
         "noNegationElse": "error",
         "useCollapsedElseIf": "error",
         "useForOf": "error",
-        "useShorthandArrayType": "error",
-        "useShorthandAssign": "error"
+        "useShorthandAssign": "error",
+        "useConsistentArrayType": {
+          "level": "error",
+          "options": {
+            "syntax": "shorthand"
+          }
+        }
       },
       "suspicious": {
         "noEmptyBlockStatements": "error",
