@@ -79,7 +79,7 @@ export async function extractSourceFiles(asarFilePath: string, sourcePath: strin
     // ensures that the spinner appears, although it will get stuck because asar.extractAll()
     // is synchronous
     await waitForTimeout();
-    extractAll(asarFilePath, sourcePath);
+    extractAll(asarFilePath, sourcePath, false);
     s.stop('Source files extracted');
   } catch (error) {
     s.stop('Error extracting source files', 2);

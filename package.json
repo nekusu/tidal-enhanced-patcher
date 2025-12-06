@@ -21,5 +21,8 @@
     "@types/adm-zip": "^0.5.7",
     "@types/bun": "latest",
     "typescript": "^5.9.3"
+  },
+  "patchedDependencies": {
+    "@electron/asar@4.0.1": "patches/@electron%2Fasar@4.0.1.patch"
   }
 }

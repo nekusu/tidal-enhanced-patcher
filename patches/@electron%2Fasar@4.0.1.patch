@@ -1,0 +1,28 @@
+diff --git a/lib/asar.d.ts b/lib/asar.d.ts
+index 648be460048570dab50ead5bf1d20694746c27a1..8acbb9910d7c941c8ed6266e502c3466275384e0 100644
+--- a/lib/asar.d.ts
++++ b/lib/asar.d.ts
+@@ -71,5 +71,5 @@ export interface ListOptions {
+ }
+ export declare function listPackage(archivePath: string, options: ListOptions): string[];
+ export declare function extractFile(archivePath: string, filename: string, followLinks?: boolean): Buffer;
+-export declare function extractAll(archivePath: string, dest: string): void;
++export declare function extractAll(archivePath: string, dest: string, followLinks?: boolean): void;
+ export { uncacheAll, uncacheFilesystem as uncache, FileRecord, DirectoryRecord } from './disk.js';
+diff --git a/lib/asar.js b/lib/asar.js
+index 164189ca704eb057b0e85e0ddb915d566bc642e1..3bf7dcb6a382cb7d457c743fcb107f1642cbfafc 100644
+--- a/lib/asar.js
++++ b/lib/asar.js
+@@ -220,11 +220,9 @@ export function extractFile(archivePath, filename, followLinks = true) {
+     }
+     return readFileSync(filesystem, filename, fileInfo);
+ }
+-export function extractAll(archivePath, dest) {
++export function extractAll(archivePath, dest, followLinks = true) {
+     const filesystem = readFilesystemSync(archivePath);
+     const filenames = filesystem.listFiles();
+-    // under windows just extract links as regular files
+-    const followLinks = process.platform === 'win32';
+     // create destination directory
+     fs.mkdirpSync(dest);
+     const extractionErrors = [];
