@@ -10,14 +10,18 @@ import AdmZip from 'adm-zip';
 import { execa } from 'execa';
 
 const NODEJS_DIST_URL = 'https://nodejs.org/dist';
-const DEFAULT_TIDAL_PATH = join(import.meta.env.APPDATA ?? '', '../Local/TIDAL');
-const EXECUTABLE_NAME = 'TIDAL.exe';
+export const isMacPlatform = process.platform === 'darwin';
+const DEFAULT_TIDAL_PATH = isMacPlatform
+  ? '/Applications/TIDAL.app'
+  : join(import.meta.env.APPDATA ?? '', '../Local/TIDAL');
+// path to the main executable, relative to `tidalPath`
+const EXECUTABLE_PATH = isMacPlatform ? 'Contents/MacOS/TIDAL' : 'TIDAL.exe';
 export const tidalPath = DEFAULT_TIDAL_PATH;
 
-export function isWindowsPlatform() {
-  const isWindows = process.platform === 'win32';
-  if (!isWindows) log.error('Only Windows platforms are supported');
-  return isWindows;
+export function isSupportedPlatform() {
+  const isSupported = process.platform === 'win32' || isMacPlatform;
+  if (!isSupported) log.error('Only Windows and macOS platforms are supported');
+  return isSupported;
 }
 
 export async function isAppRunning() {
@@ -25,15 +29,29 @@ export async function isAppRunning() {
   let isRunning = true;
   s.start('Checking if TIDAL is running...');
   try {
-    const { stdout: count } = await execa({ shell: 'powershell' })`(Get-Process -Name TIDAL).Count`;
-    isRunning = +count > 0;
-    if (isRunning) {
-      s.stop('TIDAL is currently running', 2);
-      s.start('Killing TIDAL process...');
-      await execa({ shell: 'powershell' })`Stop-Process -Name TIDAL`;
-      s.stop('TIDAL process killed');
-      isRunning = false;
-    } else s.stop('TIDAL is not running');
+    if (isMacPlatform) {
+      const { stdout } = await execa('pgrep', ['-x', 'TIDAL'], { reject: false });
+      isRunning = stdout.trim().length > 0;
+      if (isRunning) {
+        s.stop('TIDAL is currently running', 2);
+        s.start('Killing TIDAL process...');
+        await execa('pkill', ['-x', 'TIDAL'], { reject: false });
+        s.stop('TIDAL process killed');
+        isRunning = false;
+      } else s.stop('TIDAL is not running');
+    } else {
+      const { stdout: count } = await execa({
+        shell: 'powershell',
+      })`(Get-Process -Name TIDAL).Count`;
+      isRunning = +count > 0;
+      if (isRunning) {
+        s.stop('TIDAL is currently running', 2);
+        s.start('Killing TIDAL process...');
+        await execa({ shell: 'powershell' })`Stop-Process -Name TIDAL`;
+        s.stop('TIDAL process killed');
+        isRunning = false;
+      } else s.stop('TIDAL is not running');
+    }
   } catch (error) {
     s.stop('Error checking if TIDAL is running', 2);
     log.error((error as Error).message);
@@ -42,18 +60,18 @@ export async function isAppRunning() {
 }
 
 export async function existsInDefaultPath() {
-  const fileExists = await exists(join(tidalPath, EXECUTABLE_NAME));
+  const fileExists = await exists(join(tidalPath, EXECUTABLE_PATH));
   if (fileExists) log.info(`Executable found in default path: ${tidalPath}`);
   else log.error('Executable not found');
-  return exists;
+  return fileExists;
 }
 
-export async function getAppDirName() {
+async function getAppDirName() {
   let appVersion: string | undefined;
   try {
     const { stdout } = await execa({
       shell: 'powershell',
-    })`(Get-Item '${join(tidalPath, EXECUTABLE_NAME)}').VersionInfo | ConvertTo-Json`;
+    })`(Get-Item '${join(tidalPath, EXECUTABLE_PATH)}').VersionInfo | ConvertTo-Json`;
     appVersion = JSON.parse(stdout).FileVersion;
   } catch (error) {
     log.warn(`Error getting app version: ${(error as Error).message}`);
@@ -75,6 +93,21 @@ export async function getAppDirName() {
   } catch (error) {
     log.error(`Error looking for app directory: ${(error as Error).message}`);
   }
+}
+
+export async function getAppResourcesPath() {
+  if (isMacPlatform) {
+    const resourcesPath = join(tidalPath, 'Contents/Resources');
+    if (await exists(resourcesPath)) {
+      log.info(`App resources directory: ${resourcesPath}`);
+      return resourcesPath;
+    }
+    log.error('App resources directory not found');
+    return undefined;
+  }
+  const appDirName = await getAppDirName();
+  if (!appDirName) return undefined;
+  return join(tidalPath, appDirName, 'resources');
 }
 
 export function waitForTimeout(timeout = 100) {
@@ -105,7 +138,7 @@ export type Modifications = {
 };
 
 export async function injectCode(filePath: string, modifications: Modifications[]) {
-  const fileName = filePath.split('\\').at(-1);
+  const fileName = filePath.split(/[/\\]/).at(-1);
   let file: string | undefined;
   try {
     file = await readFile(filePath, { encoding: 'utf8' });
@@ -156,16 +189,21 @@ export async function download(url: string, outputPath: string) {
 }
 
 export async function downloadNpm(outputPath = 'node') {
-  let latestVersion: string | undefined;
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  const platformDistName = isMacPlatform ? 'darwin' : 'win';
+  const archiveExt = isMacPlatform ? 'tar.gz' : 'zip';
+  const archiveFile = `node.${archiveExt}`;
+  let archiveName: string | undefined;
   const s = spinner();
   s.start('Downloading npm from nodejs.org...');
   try {
     const response = await fetch(`${NODEJS_DIST_URL}/index.json`);
     const versions = await response.json();
-    latestVersion = versions[0].version;
-    const downloadURL = `${NODEJS_DIST_URL}/${latestVersion}/node-${latestVersion}-win-x64.zip`;
-    await rm('node.zip', { force: true });
-    await download(downloadURL, 'node.zip');
+    const latestVersion = versions[0].version;
+    archiveName = `node-${latestVersion}-${platformDistName}-${arch}`;
+    const downloadURL = `${NODEJS_DIST_URL}/${latestVersion}/${archiveName}.${archiveExt}`;
+    await rm(archiveFile, { force: true });
+    await download(downloadURL, archiveFile);
     s.stop('npm downloaded');
   } catch (error) {
     s.stop('Error downloading npm', 2);
@@ -174,12 +212,15 @@ export async function downloadNpm(outputPath = 'node') {
   const s2 = spinner();
   s2.start('Extracting npm...');
   try {
-    const zip = new AdmZip('node.zip');
-    const extractAllTo = promisify(zip.extractAllToAsync.bind(zip));
-    await extractAllTo('', true, false);
+    if (isMacPlatform) await execa('tar', ['-xzf', archiveFile]);
+    else {
+      const zip = new AdmZip(archiveFile);
+      const extractAllTo = promisify(zip.extractAllToAsync.bind(zip));
+      await extractAllTo('', true, false);
+    }
     await rm(outputPath, { force: true });
-    await rename(`node-${latestVersion}-win-x64`, outputPath);
-    await rm('node.zip');
+    await rename(archiveName as string, outputPath);
+    await rm(archiveFile);
     s2.stop('npm extracted');
   } catch (error) {
     s2.stop('Error extracting npm', 2);

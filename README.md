@@ -20,6 +20,8 @@ Unlike many other [awesome repositories](https://github.com/search?q=tidal+disco
 
 TIDAL Enhanced allows you to download music and videos in the highest quality directly from TIDAL thanks to the [Media Downloader](https://github.com/yaronzz/Tidal-Media-Downloader) app, just paste the track/album/artist link in the downloader and enjoy your offline music!
 
+> tidal-dl functionality only works on Windows
+
 ### Improved system tray menu
 
 <img src="./assets/system-tray.png" width="300" />
@@ -34,9 +36,11 @@ You can now access various development tools disabled by default in the producti
 
 ## Usage
 
-**Only Windows platforms are supported.**
+**Windows and macOS platforms are supported.**
 
 **Note:** App updates may require running the patcher again.
+
+**MacOS: If a file permission error appears, you need to allow the application to modify applications. Settings -> Privacy & Security -> App Management**
 
 ### Using the Precompiled Executable
 
@@ -74,7 +78,14 @@ For developers or users who want to run it directly from the source.
     **Alternatively, you can also build and run the executable** by running:
     ```sh
     bun run build
+    ```
+    ```sh
+    # Windows
     .\TIDALEnhancedPatcher.exe
+    ```
+    ```sh
+    # macOS
+    ./TIDALEnhancedPatcher
     ```
 
 ### CLI Features
@@ -90,7 +101,9 @@ The interactive CLI provides three main options: **patching**, **unpatching**, a
 #### 2. Unpatching TIDAL
 
 - The patcher will revert all changes made to the app, restoring the original asar file.
-- Alternatively, you can go to `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\resources`, remove the `app.asar` file, and rename the `app_original.asar` file to `app.asar`.
+- Alternatively, you can go to the app's `resources` folder, remove the `app.asar` file, and rename the `app_original.asar` file to `app.asar`.
+  - Windows: `C:\Users\[user]\AppData\Local\TIDAL\app-[version]\resources`
+  - macOS: `/Applications/TIDAL.app/Contents/Resources`
 
 #### 3. Extracting Source Files
 
