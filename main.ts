@@ -1,14 +1,12 @@
-import { join } from 'node:path';
 import { cancel, confirm, intro, isCancel, outro, select } from '@clack/prompts';
 import { extract } from './scripts/extract';
 import { patch } from './scripts/patch';
 import { unpatch } from './scripts/unpatch';
 import {
   existsInDefaultPath,
-  getAppDirName,
+  getAppResourcesPath,
   isAppRunning,
-  isWindowsPlatform,
-  tidalPath,
+  isSupportedPlatform,
   waitForTimeout,
 } from './utils';
 
@@ -16,11 +14,11 @@ const scripts = { patch, unpatch, extract };
 
 async function main() {
   intro('TIDAL Enhanced Patcher - https://github.com/nekusu/tidal-enhanced-patcher');
-  if (!isWindowsPlatform() || (await isAppRunning()) || !(await existsInDefaultPath())) return;
 
-  const appDirName = await getAppDirName();
-  if (!appDirName) return;
-  const appResourcesPath = join(tidalPath, appDirName, 'resources');
+  if (!isSupportedPlatform() || (await isAppRunning()) || !(await existsInDefaultPath())) return;
+
+  const appResourcesPath = await getAppResourcesPath();
+  if (!appResourcesPath) return;
 
   while (true) {
     const script = await select({

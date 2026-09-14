@@ -1,11 +1,19 @@
 import { copyFile, exists, mkdir, rm, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { confirm, isCancel, log, select, spinner, text } from '@clack/prompts';
 import { createPackage } from '@electron/asar';
 import { execa } from 'execa';
 import DiscordActivity from '../files/DiscordActivity.js' with { type: 'text' };
 import downloadMenu from '../files/downloadMenu.js' with { type: 'text' };
-import { download, downloadNpm, extractSourceFiles, injectCode, tidalPath } from '../utils';
+import {
+  download,
+  downloadNpm,
+  extractSourceFiles,
+  injectCode,
+  isMacPlatform,
+  tidalPath,
+} from '../utils';
 import { unpatch } from './unpatch';
 
 const DISCORD_CLIENT_ID = '1004259730526584873';
@@ -15,12 +23,17 @@ const TIDAL_DL_EXE_URL =
 async function checkNpmInstallation() {
   let npmPath: string | undefined;
   try {
-    const { stdout, stderr } = await execa({ reject: false })`where.exe npm`;
-    npmPath = stdout.split('\n')[0];
-    if (stderr) {
-      const downloadedNpmPath = join(process.cwd(), 'node/npm.cmd');
+    const { stdout } = await execa(isMacPlatform ? 'which' : 'where.exe', ['npm'], {
+      reject: false,
+    });
+    npmPath = stdout.split('\n')[0]?.trim();
+    if (!npmPath) {
+      const downloadedNpmPath = join(
+        process.cwd(),
+        isMacPlatform ? 'node/bin/npm' : 'node/npm.cmd',
+      );
       if (await exists(downloadedNpmPath)) npmPath = downloadedNpmPath;
-      else throw new Error(stderr);
+      else throw new Error('npm could not be found in PATH');
     }
     log.info(`Using npm from: ${npmPath}`);
   } catch (error) {
@@ -47,7 +60,9 @@ async function checkNpmInstallation() {
     }
     const manualNpmPath = await text({
       message: 'Enter path',
-      placeholder: `C:\\Users\\${import.meta.env.USERNAME}\\AppData\\Roaming\\npm\\npm.cmd`,
+      placeholder: isMacPlatform
+        ? '/usr/local/bin/npm'
+        : `C:\\Users\\${import.meta.env.USERNAME}\\AppData\\Roaming\\npm\\npm.cmd`,
     });
     if (isCancel(manualNpmPath)) throw new Error('Cancelled');
     npmPath = manualNpmPath;
@@ -79,8 +94,9 @@ async function installDiscordRpcPackage(sourcePath: string, npmPath: string) {
   }
 }
 
+// The Tidal Media Downloader project only ships a precompiled Windows executable;
+// on macOS this feature is skipped entirely (see patch()).
 async function downloadTidalDl() {
-  const homePath = import.meta.env.USERPROFILE ?? `C:\\Users\\${import.meta.env.USERNAME}`;
   const tidalDlExePath = join(tidalPath, 'tidal-dl.exe');
 
   if (await exists(tidalDlExePath))
@@ -97,14 +113,14 @@ async function downloadTidalDl() {
     }
   }
 
-  const configFilePath = join(homePath, '.tidal-dl.json');
+  const configFilePath = join(homedir(), '.tidal-dl.json');
   if (!(await exists(configFilePath))) {
     const config = {
       albumFolderFormat: '{ArtistName}/{Flag} {AlbumTitle} [{AlbumID}] [{AlbumYear}]',
       apiKeyIndex: 4,
       audioQuality: 'Master',
       checkExist: true,
-      downloadPath: join(homePath, 'Music'),
+      downloadPath: join(homedir(), 'Music'),
       includeEP: true,
       language: 0,
       lyricFile: false,
@@ -118,7 +134,7 @@ async function downloadTidalDl() {
       videoFileFormat: '{VideoNumber} - {ArtistName} - {VideoTitle}{ExplicitFlag}',
       videoQuality: 'P1080',
     };
-    await writeFile(join(homePath, '.tidal-dl.json'), JSON.stringify(config));
+    await writeFile(configFilePath, JSON.stringify(config));
     log.success('TIDAL Media Downloader config file created');
   }
 }
@@ -213,6 +229,27 @@ async function modifyTrayMenu(mainPath: string) {
       code: 'buildTrayMenu(isPlaying) {',
       type: 'replace',
     },
+    ...(isMacPlatform
+      ? [
+          {
+            reference: /if \(!this\.tray \|\| process\.platform !== 'win32'\) {/,
+            code: `if (!this.tray || (process.platform !== 'win32' && process.platform !== 'darwin')) {`,
+            type: 'replace' as const,
+          },
+          {
+            reference:
+              /if \(process\.platform !== 'win32' \|\| !this\.closeToTray \|\| this\.tray instanceof _electron\.Tray\) {/,
+            code: `if ((process.platform !== 'win32' && process.platform !== 'darwin') || !this.closeToTray || this.tray instanceof _electron.Tray) {`,
+            type: 'replace' as const,
+          },
+          {
+            reference:
+              /this\.tray = new _electron\.Tray\(_electron\.nativeImage\.createFromPath\(path\.resolve\(`\$\{__dirname\}\/\.\.\/\.\.\/assets\/icons\/icon\.png`\)\)\);/,
+            code: `this.tray = new _electron.Tray(_electron.nativeImage.createFromPath(path.resolve(\`\${__dirname}/../../assets/icons/icon.png\`)).resize({ width: 18, height: 18 }));`,
+            type: 'replace' as const,
+          },
+        ]
+      : []),
     {
       reference: /const contextMenu = _electron\.Menu\.buildFromTemplate/,
       code: `label: isPlaying ? bundle.data['t-pause'] : bundle.data['t-play'],
@@ -409,11 +446,14 @@ export async function patch(appResourcesPath: string) {
     const shouldEnableDevMenu = await confirm({ message: 'Enable dev menu?' });
     if (isCancel(shouldEnableDevMenu)) log.error('Cancelled');
     else if (shouldEnableDevMenu) await enableDevMenu(mainPath);
-    const shouldDownload = await confirm({ message: 'Download TIDAL Media Downloader?' });
-    if (isCancel(shouldDownload)) log.error('Cancelled');
-    else if (shouldDownload) {
-      await downloadTidalDl();
-      await addDownloadMenu(mainPath);
+    if (isMacPlatform) log.info('Tidal Media Downloader is not available on macOS. Skipping...');
+    else {
+      const shouldDownload = await confirm({ message: 'Download TIDAL Media Downloader?' });
+      if (isCancel(shouldDownload)) log.error('Cancelled');
+      else if (shouldDownload) {
+        await downloadTidalDl();
+        await addDownloadMenu(mainPath);
+      }
     }
     await bundleAsarPackage(appResourcesPath, asarFilePath, sourcePath);
     log.success('TIDAL patched successfully');
