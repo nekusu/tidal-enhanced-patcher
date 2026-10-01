@@ -1,10 +1,10 @@
-import { copyFile, exists, mkdir, rm, writeFile } from 'node:fs/promises';
+import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { confirm, isCancel, log, select, spinner, text } from '@clack/prompts';
-import { createPackageWithOptions } from '@electron/asar';
 import { execa } from 'execa';
 import DiscordActivity from '../files/DiscordActivity.js' with { type: 'text' };
 import { downloadNpm, extractSourceFiles, injectCode, isMacPlatform } from '../utils';
+import { installAsarPackage } from './archive';
 import { addNativeDownloads } from './downloads';
 import { unpatch } from './unpatch';
 
@@ -288,27 +288,15 @@ async function addLinksToHelpMenu(mainPath: string) {
   log.success('GitHub links added to Help menu');
 }
 
-async function bundleAsarPackage(
-  appResourcesPath: string,
-  asarFilePath: string,
-  sourcePath: string,
-) {
-  // renaming the file may cause data loss when an error occurs, copying the file is preferred
-  // renameSync(asarFilePath, join(appResourcesPath, 'app_original.asar'));
-
-  const originalAsarFilePath = join(appResourcesPath, 'app_original.asar');
-  await copyFile(asarFilePath, originalAsarFilePath);
-  await rm(asarFilePath);
-  log.info(`Original asar file backed up in ${appResourcesPath}`);
-
+async function bundleAsarPackage(appResourcesPath: string, sourcePath: string) {
   const s = spinner();
   s.start('Bundling asar package...');
   try {
-    await createPackageWithOptions(sourcePath, asarFilePath, { unpackDir: '**/ffmpeg-static' });
+    await installAsarPackage(appResourcesPath, sourcePath);
     s.stop('Asar package bundled');
+    log.info(`Original asar file backed up in ${appResourcesPath}`);
   } catch (error) {
-    await copyFile(originalAsarFilePath, asarFilePath);
-    s.stop('Error bundling asar package. Original asar file restored', 2);
+    s.stop('Error bundling asar package', 2);
     throw error;
   } finally {
     const shouldRemove = await confirm({ message: 'Remove source files? (recommended)' });
@@ -331,7 +319,9 @@ export async function patch(appResourcesPath: string) {
   try {
     if (await exists(originalAsarFilePath)) {
       log.warn('TIDAL is already patched');
-      await unpatch(appResourcesPath);
+      if (!(await unpatch(appResourcesPath))) {
+        throw new Error('Could not restore the original asar file. Patching stopped.');
+      }
     }
     const npmPath = await checkNpmInstallation();
     await extractSourceFiles(asarFilePath, sourcePath);
@@ -345,7 +335,7 @@ export async function patch(appResourcesPath: string) {
     const shouldEnableDevMenu = await confirm({ message: 'Enable dev menu?' });
     if (isCancel(shouldEnableDevMenu)) log.error('Cancelled');
     else if (shouldEnableDevMenu) await enableDevMenu(mainPath);
-    await bundleAsarPackage(appResourcesPath, asarFilePath, sourcePath);
+    await bundleAsarPackage(appResourcesPath, sourcePath);
     log.success('TIDAL patched successfully');
   } catch (error) {
     log.error((error as Error).message);
