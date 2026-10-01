@@ -29,7 +29,11 @@ export async function addNativeDownloads(sourcePath: string) {
     },
     {
       anchor: /const menu = _electron\.Menu\.buildFromTemplate\(template\);/g,
-      code: 'template.splice(1, 0, _tepDownloadMenu.default(this));\n    $&',
+      code: `const downloadMenuIndex = process.platform === 'darwin'
+      ? template.findIndex((item) => item.label === 'Developer' || item.id === 'help')
+      : 1;
+    template.splice(downloadMenuIndex < 0 ? template.length : downloadMenuIndex, 0, _tepDownloadMenu.default(this));
+    $&`,
     },
   ];
   // Fail before writing anything if TIDAL changes these integration points.
