@@ -16,6 +16,21 @@ const trackRow = `
     <div role="cell" id="duration" data-test="duration">3:14</div>
     <div role="cell"><button id="track-more" data-type="contextmenu-open" data-test="context-menu-button" data-id="42"><svg><path id="track-more-icon" /></svg></button></div>
   </div>`;
+// Artist pages and their full song lists use a different table component.
+const artistTrackRow = `
+  <table><tbody><tr id="artist-song-row" data-test="tracklist-row--selected-false">
+    <td><button data-test="image-container-track-42"><img id="artist-song-cover" /></button></td>
+    <td><div><span id="artist-song-title">Song</span></div></td>
+    <td><a id="artist-song-artist" href="/artist/8">Artist</a></td>
+    <td><a id="artist-song-album" data-test="table-cell-album" href="/album/20">Album</a></td>
+    <td id="artist-song-duration">3:14</td>
+    <td><button data-type="contextmenu-open" data-test="tracklist-id-42-context-menu-button"><svg><path id="artist-song-more" /></svg></button></td>
+  </tr></tbody></table>`;
+const albumCard = `
+  <div id="album-card" data-test="album-card-20" role="presentation">
+    <div><div><img id="album-cover" /></div><div id="album-overlay"></div></div>
+    <div><span><a id="album-title" href="/album/20">Album</a></span><div>2026 · Album</div></div>
+  </div>`;
 const nativeMenu = `
   <div role="menu" data-test="contextmenu">
     <ul class="_actionList_123" data-type="list-container__context-menu">
@@ -28,7 +43,11 @@ const nativeMenu = `
     <button data-test="context-menu-close-button">Close</button>
   </div>`;
 
-function mount({ row = trackRow, withMenu = true } = {}) {
+function mount({
+  row = trackRow,
+  withMenu = true,
+  pageUrl = `https://desktop.tidal.com/playlist/${playlistId}`,
+} = {}) {
   const { window, document } = parseHTML(
     `<html><body>
       <div data-test="header-controls"><button id="playlist-more" data-test="show-context-menu-button">More</button></div>
@@ -93,7 +112,7 @@ function mount({ row = trackRow, withMenu = true } = {}) {
     document,
     location: {
       origin: 'https://desktop.tidal.com',
-      href: `https://desktop.tidal.com/playlist/${playlistId}`,
+      href: pageUrl,
     },
     MutationObserver: window.MutationObserver,
     KeyboardEvent: window.Event,
@@ -171,6 +190,120 @@ describe('download UI bridge', () => {
     });
     trigger('track');
     expect(document.querySelector('[data-tep-download]')).toBeNull();
+  });
+
+  test.each([
+    ['artist-song-row', 'contextmenu'],
+    ['artist-song-title', 'contextmenu'],
+    ['artist-song-cover', 'contextmenu'],
+    ['artist-song-duration', 'contextmenu'],
+    ['artist-song-artist', 'contextmenu'],
+    ['artist-song-album', 'contextmenu'],
+    ['artist-song-more', 'click'],
+  ])('queues an artist-page song from %s (%s)', async (id, event) => {
+    const { document, calls, trigger } = mount({
+      row: artistTrackRow,
+      pageUrl: 'https://desktop.tidal.com/artist/8',
+    });
+    trigger(id, event);
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(1);
+    document.querySelector('[data-tep-download] button').click();
+    await Promise.resolve();
+    expect(calls.find((call) => call.command === 'enqueue').payload).toEqual({
+      type: 'track',
+      id: '42',
+    });
+  });
+
+  test('resolves a selected song in the full artist song list using its More button', async () => {
+    const { document, calls, trigger } = mount({
+      row: `<div data-test="view-all--track-list">${artistTrackRow
+        .replace('tracklist-row--selected-false', 'tracklist-row--selected-true')
+        .replace('data-test="image-container-track-42"', '')}</div>`,
+      pageUrl: 'https://desktop.tidal.com/artist/8',
+    });
+    trigger('artist-song-title');
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(1);
+    document.querySelector('[data-tep-download] button').click();
+    await Promise.resolve();
+    expect(calls.find((call) => call.command === 'enqueue').payload).toEqual({
+      type: 'track',
+      id: '42',
+    });
+  });
+
+  test('does not substitute an artist song’s album when the song ID is unavailable', () => {
+    const { document, trigger } = mount({
+      row: artistTrackRow
+        .replace('data-test="image-container-track-42"', '')
+        .replace('data-test="tracklist-id-42-context-menu-button"', ''),
+      pageUrl: 'https://desktop.tidal.com/artist/8',
+    });
+    trigger('artist-song-album');
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(0);
+  });
+
+  test.each([
+    'album-card',
+    'album-cover',
+    'album-overlay',
+    'album-title',
+  ])('queues the album from its artist-page card at %s', async (id) => {
+    const { document, calls, trigger } = mount({
+      row: albumCard,
+      pageUrl: 'https://desktop.tidal.com/artist/8',
+    });
+    trigger(id);
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(1);
+    document.querySelector('[data-tep-download] button').click();
+    await Promise.resolve();
+    expect(calls.find((call) => call.command === 'enqueue').payload).toEqual({
+      type: 'album',
+      id: '20',
+    });
+  });
+
+  test.each(['card-cover', 'card-title'])('queues a track card from %s', async (id) => {
+    const { document, calls, trigger } = mount({
+      row: `<div data-test="track-card-42" role="presentation">
+        <img id="card-cover" />
+        <a id="card-title" href="/album/20/track/42">Song</a>
+      </div>`,
+    });
+    trigger(id);
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(1);
+    document.querySelector('[data-tep-download] button').click();
+    await Promise.resolve();
+    expect(calls.find((call) => call.command === 'enqueue').payload).toEqual({
+      type: 'track',
+      id: '42',
+    });
+  });
+
+  test('does not inherit a playlist-card download when opening its creator’s menu', () => {
+    const { document, trigger } = mount({
+      row: `<div data-test="playlist-card-${playlistId}" role="presentation">
+        <img id="card-cover" /><a id="card-creator" href="/user/123">Username</a>
+      </div>`,
+    });
+    trigger('card-cover');
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(1);
+    trigger('card-creator');
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(0);
+  });
+
+  test.each([
+    'album-card-invalid',
+    'album-card-20-header',
+    'mix-card-20',
+    'user-card-20',
+  ])('does not offer downloads for an unsupported card (%s)', (dataTest) => {
+    const { document, trigger } = mount({
+      row: albumCard.replace('data-test="album-card-20"', `data-test="${dataTest}"`),
+      pageUrl: 'https://desktop.tidal.com/artist/8',
+    });
+    trigger('album-cover');
+    expect(document.querySelectorAll('[data-tep-download]')).toHaveLength(0);
   });
 
   test('queues a video row as a video', async () => {

@@ -22,6 +22,9 @@ function fromLink(value) {
       )
     )
       return null;
+    // Track cards link to the song within its album rather than /track/:id.
+    const albumTrack = url.pathname.match(/^\/(?:browse\/)?album\/\d{1,20}\/track\/(\d{1,20})\/?$/);
+    if (albumTrack) return reference('track', albumTrack[1]);
     const match = url.pathname.match(
       /^\/(?:browse\/)?(track|album|playlist|artist|video)\/([^/]+)\/?$/,
     );
@@ -41,7 +44,7 @@ function metadata(element) {
 function resolveTarget(element, pageUrl, allowPage = false) {
   if (!element?.closest) return null;
   const trackRow = element.closest(
-    '[data-test="tracklist-row"], [data-type="media-table__row"], [data-track-id]',
+    '[data-test="tracklist-row"], [data-test^="tracklist-row--selected-"], [data-type="media-table__row"], [data-track-id]',
   );
   if (trackRow) {
     const own = metadata(trackRow);
@@ -57,6 +60,18 @@ function resolveTarget(element, pageUrl, allowPage = false) {
       const item = metadata(child) || reference(type, child.getAttribute('data-id'));
       if (item && ['track', 'video'].includes(item.type)) return item;
     }
+    // Artist song tables expose their track ID in the artwork and More button
+    // test attributes, including the full song list opened through View all.
+    for (const child of trackRow.querySelectorAll(
+      '[data-test^="image-container-track-"], [data-test^="tracklist-id-"]',
+    )) {
+      const match = child
+        .getAttribute('data-test')
+        .match(
+          /^(?:image-container-track-(\d{1,20})|tracklist-id-(\d{1,20})-context-menu-button)$/,
+        );
+      if (match) return reference('track', match[1] || match[2]);
+    }
     const link = trackRow.querySelector('a[href*="/track/"], a[href*="/video/"]');
     // An unresolved song must never become its album, artist, or entire playlist.
     return link ? fromLink(link.getAttribute('href')) : null;
@@ -69,6 +84,12 @@ function resolveTarget(element, pageUrl, allowPage = false) {
     // Unsupported entities (especially profile links) are boundaries, not an
     // invitation to use the containing playlist or the current page instead.
     if (current.matches('a[href]')) return fromLink(current.getAttribute('href'));
+    // Current artist-page cards put their identity on the card itself. Its
+    // artwork and hover overlay are siblings of the title link, not children.
+    const card = current
+      .getAttribute('data-test')
+      ?.match(/^(track|album|playlist|artist|video)-card-(.+)$/);
+    if (card) return reference(card[1], card[2]);
     if (current.hasAttribute('data-track--content-type') || current.hasAttribute('data-item-type'))
       return metadata(current);
     current = current.parentElement;
