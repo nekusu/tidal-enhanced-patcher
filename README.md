@@ -18,10 +18,27 @@ Unlike many other [awesome repositories](https://github.com/search?q=tidal+disco
 
 Right-click a track, album, playlist, artist, or video and choose **Download**.
 
+<img src="./assets/download-dropdown.png" alt="TIDAL song context menu with the Download option" width="400" />
+
 The **Download** menu contains:
+
+<img src="./assets/download-hamburger.png" alt="TIDAL Download menu with queue and settings options" width="320" />
 
 - **Download queue…** (`Ctrl+D` / `Cmd+D`): progress, errors, cancel, retry, pause after the current selection, open the output folder, and download by pasted TIDAL link.
 - **Download settings…**: output folder, audio quality, video resolution, naming templates, existing-file handling, playlist folders, artist EPs/singles, concurrent downloads, artwork, lyrics, and album information.
+
+<details>
+<summary>View the download queue and settings</summary>
+
+**Download queue**
+
+<img src="./assets/download-queue.png" alt="Download queue with a TIDAL link field and queue controls" width="760" />
+
+**Download settings**
+
+<img src="./assets/download-menu.png" alt="Download settings for folders, quality, file naming, and artwork" width="760" />
+
+</details>
 
 Compatible preferences from `~/.tidal-dl.json` are imported once. Native settings are stored in `tep-downloads.json` in TIDAL's user data directory.
 
