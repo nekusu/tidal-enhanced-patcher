@@ -16,11 +16,35 @@ Unlike many other [awesome repositories](https://github.com/search?q=tidal+disco
 
 ### Download your favorite music
 
-<img src="./assets/download-menu.png" width="300" />
+Right-click a track, album, playlist, artist, or video and choose **Download**.
 
-TIDAL Enhanced allows you to download music and videos in the highest quality directly from TIDAL thanks to the [Media Downloader](https://github.com/yaronzz/Tidal-Media-Downloader) app, just paste the track/album/artist link in the downloader and enjoy your offline music!
+<img src="./assets/download-dropdown.png" alt="TIDAL song context menu with the Download option" width="400" />
 
-> tidal-dl functionality only works on Windows
+The **Download** menu contains:
+
+<img src="./assets/download-hamburger.png" alt="TIDAL Download menu with queue and settings options" width="320" />
+
+- **Download queue…** (`Ctrl+D` / `Cmd+D`): progress, errors, cancel, retry, pause after the current selection, open the output folder, and download by pasted TIDAL link.
+- **Download settings…**: output folder, audio quality, video resolution, naming templates, existing-file handling, playlist folders, artist EPs/singles, concurrent downloads, artwork, lyrics, and album information.
+
+<details>
+<summary>View the download queue and settings</summary>
+
+**Download queue**
+
+<img src="./assets/download-queue.png" alt="Download queue with a TIDAL link field and queue controls" width="760" />
+
+**Download settings**
+
+<img src="./assets/download-menu.png" alt="Download settings for folders, quality, file naming, and artwork" width="760" />
+
+</details>
+
+Compatible preferences from `~/.tidal-dl.json` are imported once. Native settings are stored in `tep-downloads.json` in TIDAL's user data directory.
+
+Downloads support direct audio. Available quality depends on the account and the stream TIDAL returns. Livestreams and some protected content aren't supported. Downloads do not resume across app restarts; retrying skips existing completed files by default.
+
+**Downloads utilize your existing TIDAL login, no separate authentication needed.**
 
 ### Improved system tray menu
 
@@ -109,9 +133,12 @@ The interactive CLI provides three main options: **patching**, **unpatching**, a
 
 - The patcher will extract the source files from the asar archive.
 
+## Development checks
+
+Run `bun test` and `bun run typecheck`. Tests use generated audio, simulated TIDAL responses, and DOM fixtures; no account or music downloads are needed. Native menu installation validates its integration points and stops patching if the desktop source layout is incompatible. The remotely served music UI can still change independently of desktop updates.
+
 ## Disclaimer
 
-- [TIDAL Media Downloader disclaimer](https://github.com/yaronzz/Tidal-Media-Downloader#-disclaimer).
 - This repository does not distribute any original or modified source code of the TIDAL desktop app.
 - I am in no way responsible for account bans for using a modified client. Use the patcher at your own risk.
 

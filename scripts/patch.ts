@@ -1,24 +1,14 @@
-import { copyFile, exists, mkdir, rm, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { confirm, isCancel, log, select, spinner, text } from '@clack/prompts';
-import { createPackage } from '@electron/asar';
 import { execa } from 'execa';
 import DiscordActivity from '../files/DiscordActivity.js' with { type: 'text' };
-import downloadMenu from '../files/downloadMenu.js' with { type: 'text' };
-import {
-  download,
-  downloadNpm,
-  extractSourceFiles,
-  injectCode,
-  isMacPlatform,
-  tidalPath,
-} from '../utils';
+import { downloadNpm, extractSourceFiles, injectCode, isMacPlatform } from '../utils';
+import { installAsarPackage } from './archive';
+import { addNativeDownloads } from './downloads';
 import { unpatch } from './unpatch';
 
 const DISCORD_CLIENT_ID = '1004259730526584873';
-const TIDAL_DL_EXE_URL =
-  'https://github.com/yaronzz/Tidal-Media-Downloader/raw/master/TIDALDL-PY/exe/tidal-dl.exe';
 
 async function checkNpmInstallation() {
   let npmPath: string | undefined;
@@ -77,65 +67,22 @@ async function checkNpmInstallation() {
   return npmPath;
 }
 
-async function installDiscordRpcPackage(sourcePath: string, npmPath: string) {
+async function installRuntimePackages(sourcePath: string, npmPath: string) {
   const s = spinner();
-  s.start('Installing @xhayper/discord-rpc package...');
+  s.start('Installing Discord RPC and native download helpers...');
   try {
-    const { stderr } = await execa({
-      cwd: sourcePath,
-      reject: false,
-    })`${npmPath} i @xhayper/discord-rpc`;
-    if (stderr.includes('npm err')) throw new Error(stderr);
-    s.stop('@xhayper/discord-rpc package installed');
+    const { stderr } = await execa(
+      npmPath,
+      ['install', '@xhayper/discord-rpc', 'fast-xml-parser@5.11.2', 'ffmpeg-static@5.3.0'],
+      {
+        cwd: sourcePath,
+      },
+    );
+    s.stop('Discord RPC and native download helpers installed');
     if (stderr.includes('npm warn')) log.warn(stderr);
   } catch (error) {
-    s.stop('Error installing @xhayper/discord-rpc package', 2);
+    s.stop('Error installing runtime packages', 2);
     throw error;
-  }
-}
-
-// The Tidal Media Downloader project only ships a precompiled Windows executable;
-// on macOS this feature is skipped entirely (see patch()).
-async function downloadTidalDl() {
-  const tidalDlExePath = join(tidalPath, 'tidal-dl.exe');
-
-  if (await exists(tidalDlExePath))
-    log.info('Tidal Media Downloader already exists. Download skipped');
-  else {
-    const s = spinner();
-    s.start('Downloading Tidal Media Downloader...');
-    try {
-      await download(TIDAL_DL_EXE_URL, tidalDlExePath);
-      s.stop('Tidal Media Downloader installed');
-    } catch (error) {
-      s.stop('Error downloading Tidal Media Downloader', 2);
-      throw error;
-    }
-  }
-
-  const configFilePath = join(homedir(), '.tidal-dl.json');
-  if (!(await exists(configFilePath))) {
-    const config = {
-      albumFolderFormat: '{ArtistName}/{Flag} {AlbumTitle} [{AlbumID}] [{AlbumYear}]',
-      apiKeyIndex: 4,
-      audioQuality: 'Master',
-      checkExist: true,
-      downloadPath: join(homedir(), 'Music'),
-      includeEP: true,
-      language: 0,
-      lyricFile: false,
-      multiThread: true,
-      saveAlbumInfo: false,
-      saveCovers: true,
-      showProgress: true,
-      showTrackInfo: true,
-      trackFileFormat: '{TrackNumber} - {ArtistName} - {TrackTitle}{ExplicitFlag}',
-      usePlaylistFolder: true,
-      videoFileFormat: '{VideoNumber} - {ArtistName} - {VideoTitle}{ExplicitFlag}',
-      videoQuality: 'P1080',
-    };
-    await writeFile(configFilePath, JSON.stringify(config));
-    log.success('TIDAL Media Downloader config file created');
   }
 }
 
@@ -313,8 +260,7 @@ async function addLinksToHelpMenu(mainPath: string) {
   await injectCode(menuEventEnumFilePath, [
     {
       reference: /MenuEvent\["SUPPORT"\]/,
-      code: `MenuEvent["GITHUB_TEP"] = "github.tep";
-        MenuEvent["GITHUB_TDL"] = "github.tdl";`,
+      code: 'MenuEvent["GITHUB_TEP"] = "github.tep";',
     },
   ]);
   await injectCode(helpMenuFilePath, [
@@ -322,12 +268,6 @@ async function addLinksToHelpMenu(mainPath: string) {
       reference: /label: settings\.locale\.data\['t-about'\]/,
       code: `label: 'About TIDAL Enhanced',
         id: _MenuEventEnum.default.GITHUB_TEP,
-        enabled: true,
-        type: 'normal',
-        click: delegate.menuClick.bind(delegate)
-      }, {
-        label: 'About TIDAL Media Downloader',
-        id: _MenuEventEnum.default.GITHUB_TDL,
         enabled: true,
         type: 'normal',
         click: delegate.menuClick.bind(delegate)
@@ -341,77 +281,22 @@ async function addLinksToHelpMenu(mainPath: string) {
       code: `case _MenuEventEnum.default.GITHUB_TEP:
         _electron.shell.openExternal('https://github.com/nekusu/tidal-enhanced-patcher');
         break;
-      case _MenuEventEnum.default.GITHUB_TDL:
-        _electron.shell.openExternal('https://github.com/yaronzz/Tidal-Media-Downloader');
-        break;`,
+      `,
       offset: -1,
     },
   ]);
   log.success('GitHub links added to Help menu');
 }
 
-async function addDownloadMenu(mainPath: string) {
-  const menuPath = join(mainPath, 'menu');
-  const menuEventEnumFilePath = join(menuPath, 'MenuEventEnum.js');
-  const menuControllerFilePath = join(menuPath, 'MenuController.js');
-  const downloadMenuFileName = 'downloadMenu.js';
-
-  await writeFile(join(menuPath, downloadMenuFileName), downloadMenu as unknown as string);
-  await injectCode(menuEventEnumFilePath, [
-    {
-      reference: /MenuEvent\["NAVIGATION"\]/,
-      code: `MenuEvent["DOWNLOAD"] = "download";
-        MenuEvent["OPEN_DL_GUI"] = "open.dl.gui";
-        MenuEvent["OPEN_DL_CLI"] = "open.dl.cli";`,
-    },
-  ]);
-  await injectCode(menuControllerFilePath, [
-    {
-      reference: /var _electron/,
-      code: `var child_process = _interopRequireWildcard(require("child_process"));
-        var _config = _interopRequireDefault(require("../config/windowsConfiguration"));
-        var _downloadMenu = _interopRequireDefault(require("./downloadMenu"));`,
-    },
-    {
-      reference: /const menu/,
-      code: 'template.splice(1, 0, (0, _downloadMenu.default)(this));',
-      offset: -1,
-    },
-    {
-      reference: /case _MenuEventEnum\.default\.NAVIGATE_ABOUT:/,
-      code: `case _MenuEventEnum.default.OPEN_DL_GUI:
-        child_process.execFile(path.join(_config.default.machineUUIDPath, 'tidal-dl.exe'), ['-g']);
-        break;
-      case _MenuEventEnum.default.OPEN_DL_CLI:
-        child_process.exec(\`start cmd /c \${path.join(_config.default.machineUUIDPath, 'tidal-dl.exe')}\`);
-        break;`,
-      offset: -2,
-    },
-  ]);
-  log.success('Download menu created');
-}
-
-async function bundleAsarPackage(
-  appResourcesPath: string,
-  asarFilePath: string,
-  sourcePath: string,
-) {
-  // renaming the file may cause data loss when an error occurs, copying the file is preferred
-  // renameSync(asarFilePath, join(appResourcesPath, 'app_original.asar'));
-
-  const originalAsarFilePath = join(appResourcesPath, 'app_original.asar');
-  await copyFile(asarFilePath, originalAsarFilePath);
-  await rm(asarFilePath);
-  log.info(`Original asar file backed up in ${appResourcesPath}`);
-
+async function bundleAsarPackage(appResourcesPath: string, sourcePath: string) {
   const s = spinner();
   s.start('Bundling asar package...');
   try {
-    await createPackage(sourcePath, asarFilePath);
+    await installAsarPackage(appResourcesPath, sourcePath);
     s.stop('Asar package bundled');
+    log.info(`Original asar file backed up in ${appResourcesPath}`);
   } catch (error) {
-    await copyFile(originalAsarFilePath, asarFilePath);
-    s.stop('Error bundling asar package. Original asar file restored', 2);
+    s.stop('Error bundling asar package', 2);
     throw error;
   } finally {
     const shouldRemove = await confirm({ message: 'Remove source files? (recommended)' });
@@ -434,11 +319,15 @@ export async function patch(appResourcesPath: string) {
   try {
     if (await exists(originalAsarFilePath)) {
       log.warn('TIDAL is already patched');
-      await unpatch(appResourcesPath);
+      if (!(await unpatch(appResourcesPath))) {
+        throw new Error('Could not restore the original asar file. Patching stopped.');
+      }
     }
     const npmPath = await checkNpmInstallation();
     await extractSourceFiles(asarFilePath, sourcePath);
-    await installDiscordRpcPackage(sourcePath, npmPath);
+    await addNativeDownloads(sourcePath);
+    log.success('Native download menus and queue installed');
+    await installRuntimePackages(sourcePath, npmPath);
     await createDiscordActivity(mainPath);
     await createDiscordRpcSetting(mainPath);
     await modifyTrayMenu(mainPath);
@@ -446,16 +335,7 @@ export async function patch(appResourcesPath: string) {
     const shouldEnableDevMenu = await confirm({ message: 'Enable dev menu?' });
     if (isCancel(shouldEnableDevMenu)) log.error('Cancelled');
     else if (shouldEnableDevMenu) await enableDevMenu(mainPath);
-    if (isMacPlatform) log.info('Tidal Media Downloader is not available on macOS. Skipping...');
-    else {
-      const shouldDownload = await confirm({ message: 'Download TIDAL Media Downloader?' });
-      if (isCancel(shouldDownload)) log.error('Cancelled');
-      else if (shouldDownload) {
-        await downloadTidalDl();
-        await addDownloadMenu(mainPath);
-      }
-    }
-    await bundleAsarPackage(appResourcesPath, asarFilePath, sourcePath);
+    await bundleAsarPackage(appResourcesPath, sourcePath);
     log.success('TIDAL patched successfully');
   } catch (error) {
     log.error((error as Error).message);
